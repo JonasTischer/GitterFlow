@@ -5,23 +5,22 @@ import { startCommand } from "./start";
 import type { CommandDefinition } from "./types";
 
 export const commandMap: Record<string, CommandDefinition> = {
-  help: helpCommand,
-  start: startCommand,
-  list: listCommand,
-  delete: deleteCommand,
+	help: helpCommand,
+	start: startCommand,
+	list: listCommand,
+	delete: deleteCommand,
 };
 
 for (const definition of Object.values(commandMap)) {
-  if (!definition.aliases) continue;
-  for (const alias of definition.aliases) {
-    commandMap[alias] = definition;
-  }
+	if (!definition.aliases) continue;
+	for (const alias of definition.aliases) {
+		commandMap[alias] = definition;
+	}
 }
 
 export const orderedCommands: CommandDefinition[] = [
-  startCommand,
-  listCommand,
-  deleteCommand,
-  helpCommand,
+	startCommand,
+	listCommand,
+	deleteCommand,
+	helpCommand,
 ];
-

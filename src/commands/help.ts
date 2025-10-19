@@ -16,13 +16,12 @@ Examples:
 `.trim();
 
 export const helpCommand: CommandDefinition = {
-  name: "help",
-  description: "Show usage information",
-  usage: "gitterflow help",
-  aliases: ["--help", "-h"],
-  run: ({ stdout }) => {
-    stdout(HELP_MESSAGE);
-    return 0;
-  },
+	name: "help",
+	description: "Show usage information",
+	usage: "gitterflow help",
+	aliases: ["--help", "-h"],
+	run: ({ stdout }) => {
+		stdout(HELP_MESSAGE);
+		return 0;
+	},
 };
-
