@@ -1,0 +1,19 @@
+{
+	"name": "gitterflow",
+	"version": "0.1.0",
+	"module": "src/index.ts",
+	"devDependencies": {
+		"@biomejs/biome": "2.2.6",
+		"@types/bun": "latest",
+		"lefthook": "^1.13.6",
+		"lint-staged": "^16.2.4"
+	},
+	"peerDependencies": {
+		"typescript": "^5"
+	},
+	"bin": {
+		"gitterflow": "./src/index.ts"
+	},
+	"scripts": {},
+	"type": "module"
+}

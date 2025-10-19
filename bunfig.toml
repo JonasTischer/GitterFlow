@@ -1,0 +1,31 @@
+# Bun configuration for GitterFlow CLI
+
+[test]
+# Enable coverage by default
+coverage = true
+
+# Coverage thresholds (80% minimum)
+coverageThreshold = { lines = 0.8, functions = 0.8, statements = 0.8 }
+
+# Coverage reporters
+coverageReporter = ["text", "lcov"]
+
+# Output directory for coverage reports
+coverageDir = "coverage"
+
+# Skip test files from coverage calculation
+coverageSkipTestFiles = true
+
+# Exclude patterns from coverage
+coveragePathIgnorePatterns = [
+  "node_modules/**",
+  "tests/fixtures/**",
+  "**/*.test.ts",
+  "**/*.spec.ts"
+]
+
+# Test timeout (5 seconds default)
+# timeout = 5000
+
+# Preload files before running tests (useful for global mocks)
+# preload = ["./tests/setup.ts"]
