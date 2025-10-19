@@ -39,6 +39,24 @@ gf cleanup feature-branch
 
 ## Development
 
+
+## Setting Up Development Environment
+
+```bash
+# Install dependencies
+bun install
+
+# Link CLI globally for testing
+bun link
+```
+
+Install lefthook for git hooks:
+
+```bash
+bunx lefthook install
+```
+
+
 This project follows **Test-Driven Development (TDD)** practices.
 
 ### Running Tests

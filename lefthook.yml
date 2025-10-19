@@ -6,6 +6,6 @@ pre-commit:
       include: "./src/**/*.{js,jsx,ts,tsx}"
       exclude: "node_modules"
     tests:
-      run: npm run test
+      run: bun test
       include: "./src/**/*.{js,jsx,ts,tsx}"
       exclude: "node_modules"
