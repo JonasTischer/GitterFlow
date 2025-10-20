@@ -62,18 +62,41 @@ This project follows **Test-Driven Development (TDD)** practices.
 ### Running Tests
 
 ```bash
-# Run all tests
-bun test
+# Run unit tests only (fast - for development)
+bun run test
+# or
+bun run test:unit
 
-# Run tests in watch mode
-bun test --watch
+# Run integration tests only (slower - real git operations)
+bun run test:integration
 
-# Run tests with coverage
-bun test --coverage
+# Run all tests (unit + integration)
+bun run test:all
+
+# Run tests in watch mode (unit tests only)
+bun run test:watch
+
+# Run tests with coverage report
+bun run test:coverage
 
 # Run specific test file
-bun test tests/commands/create.test.ts
+bun test tests/commands/start.test.ts
+bun test tests/integration/start.integration.test.ts
 ```
+
+**Test Types:**
+- **Unit Tests** (`tests/commands/*.test.ts`, `tests/cli.test.ts`)
+  - Fast (milliseconds)
+  - Mock git commands
+  - Test business logic in isolation
+  - Run on every save during development
+
+- **Integration Tests** (`tests/integration/*.integration.test.ts`)
+  - Slower (seconds)
+  - Execute real git commands
+  - Create temporary repositories
+  - Verify end-to-end workflows
+  - Run before commits and in CI
 
 ### TDD Workflow
 

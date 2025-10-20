@@ -5,15 +5,45 @@ on:
   pull_request:
 
 jobs:
-  build:
-    name: test-gitterflow-cli
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install bun
         uses: oven-sh/setup-bun@v2
-      - name: Install dependencies # (assuming your project has dependencies)
-        run: bun install # You can use npm/yarn/pnpm instead if you prefer
-      - name: Run tests
-        run: bun test
+      - name: Install dependencies
+        run: bun install
+      - name: Run unit tests
+        run: bun run test:unit
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install
+      - name: Run integration tests
+        run: bun run test:integration
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install
+      - name: Run tests with coverage
+        run: bun run test:coverage

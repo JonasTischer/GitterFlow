@@ -8,14 +8,28 @@ export const startCommand: CommandDefinition = {
 	run: async ({ args, stderr, stdout, exec }) => {
 		const [branch] = args;
 
-		if (!branch) {
+		// Validate branch name
+		if (!branch || branch.trim() === "") {
 			stderr("❌ Please provide a branch name");
 			return 1;
 		}
 
-		const run = exec ?? $;
-		await run`git worktree add ../${branch} ${branch}`;
-		stdout(`✅ Created worktree for branch ${branch}`);
-		return 0;
+		const trimmedBranch = branch.trim();
+
+		try {
+			// Use -b flag to create a new branch in the worktree
+			// This creates the branch from current HEAD (base branch)
+			// git worktree add -b <branch-name> <path>
+			const run = exec ?? $;
+			await run`git worktree add -b ${trimmedBranch} ../${trimmedBranch}`;
+			stdout(`✅ Created worktree for branch ${trimmedBranch}`);
+			return 0;
+		} catch (error) {
+			// Handle git errors gracefully
+			stderr(
+				`❌ Failed to create worktree: ${error instanceof Error ? error.message : String(error)}`,
+			);
+			return 1;
+		}
 	},
 };

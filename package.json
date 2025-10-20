@@ -15,10 +15,17 @@
 		"gitterflow": "./src/index.ts"
 	},
 	"scripts": {
-		"biome:lint": "biome lint ./src",
-		"biome:format": "biome format ./src --write",
-		"biome:check": "biome check ./src",
-		"biome:check:apply": "biome check ./src --apply"
+		"test": "bun test tests/commands/ tests/cli.test.ts tests/example.test.ts",
+		"test:unit": "bun test tests/commands/ tests/cli.test.ts tests/example.test.ts",
+		"test:integration": "bun test tests/integration/",
+		"test:all": "bun test",
+		"test:watch": "bun test --watch tests/commands/ tests/cli.test.ts",
+		"test:coverage": "bun test --coverage",
+		"check": "biome check src tests",
+		"check:fix": "biome check src tests --write",
+		"format": "biome format src tests --write",
+		"lint": "biome lint src tests",
+		"lint:fix": "biome lint src tests --write"
 	},
 	"type": "module"
 }
