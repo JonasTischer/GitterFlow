@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { deleteCommand } from "../../src/commands/delete";
-import { captureExec, commandIO, noExec } from "../utils";
+import { deleteCommand } from "../../../src/commands/delete";
+import { captureExec, commandIO, noExec } from "../test-helpers";
 
 /**
  * Test Suite: delete command

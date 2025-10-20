@@ -16,11 +16,8 @@
 	},
 	"scripts": {
 		"prepare": "bunx lefthook install",
-		"test": "bun test tests/commands/ tests/cli.test.ts",
-		"test:unit": "bun test tests/commands/ tests/cli.test.ts",
+		"test:unit": "bun test tests/unit/",
 		"test:integration": "bun test tests/integration/",
-		"test:all": "bun test",
-		"test:watch": "bun test --watch tests/commands/ tests/cli.test.ts",
 		"test:coverage": "bun test --coverage",
 		"check": "biome check src tests",
 		"check:fix": "biome check src tests --write",

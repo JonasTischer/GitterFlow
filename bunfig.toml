@@ -1,9 +1,6 @@
 # Bun configuration for GitterFlow CLI
 
 [test]
-# Enable coverage only when --coverage flag is passed
-coverage = false
-
 # Coverage thresholds (80% minimum) - only enforced when coverage is enabled
 coverageThreshold = { lines = 0.8, functions = 0.8, statements = 0.8 }
 
@@ -20,6 +17,7 @@ coverageSkipTestFiles = true
 coveragePathIgnorePatterns = [
   "node_modules/**",
   "tests/fixtures/**",
+  "tests/**/test-helpers.ts",
   "**/*.test.ts",
   "**/*.spec.ts"
 ]
