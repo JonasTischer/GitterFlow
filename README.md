@@ -53,7 +53,7 @@ bun link
 Install lefthook for git hooks:
 
 ```bash
-bunx lefthook install
+bun prepare
 ```
 
 

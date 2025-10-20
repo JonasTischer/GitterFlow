@@ -15,6 +15,7 @@
 		"gitterflow": "./src/index.ts"
 	},
 	"scripts": {
+		"prepare": "bunx lefthook install",
 		"test": "bun test tests/commands/ tests/cli.test.ts",
 		"test:unit": "bun test tests/commands/ tests/cli.test.ts",
 		"test:integration": "bun test tests/integration/",
