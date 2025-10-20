@@ -2,10 +2,10 @@ pre-commit:
   parallel: true
   commands:
     lint:
-      run: bun run biome:format
-      include: "./src/**/*.{js,jsx,ts,tsx}"
+      run: bun run check:fix
+      include: "./src/**/*.{js,jsx,ts,tsx,yml,yaml,json}"
       exclude: "node_modules"
     tests:
       run: bun test
-      include: "./src/**/*.{js,jsx,ts,tsx}"
+      include: "./tests/**/*.{js,jsx,ts,tsx}"
       exclude: "node_modules"

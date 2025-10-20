@@ -15,8 +15,8 @@
 		"gitterflow": "./src/index.ts"
 	},
 	"scripts": {
-		"test": "bun test tests/commands/ tests/cli.test.ts tests/example.test.ts",
-		"test:unit": "bun test tests/commands/ tests/cli.test.ts tests/example.test.ts",
+		"test": "bun test tests/commands/ tests/cli.test.ts",
+		"test:unit": "bun test tests/commands/ tests/cli.test.ts",
 		"test:integration": "bun test tests/integration/",
 		"test:all": "bun test",
 		"test:watch": "bun test --watch tests/commands/ tests/cli.test.ts",

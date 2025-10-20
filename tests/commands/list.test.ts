@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { listCommand } from "../../src/commands/list";
 import { captureExec, commandIO } from "../utils";
 
-describe("start command", () => {
+describe("list command", () => {
 	describe("argument validation", () => {
 		test("should invoke git worktree list", async () => {
 			const { exec, calls } = captureExec();
