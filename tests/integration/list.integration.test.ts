@@ -1,6 +1,6 @@
-import { $ } from "bun";
-import { join } from "node:path";
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
+import { $ } from "bun";
 import { createTestRepo } from "./test-helpers";
 
 describe("list command (integration)", () => {

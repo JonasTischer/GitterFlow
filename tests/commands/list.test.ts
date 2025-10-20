@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { captureExec, commandIO } from "../utils";
 import { listCommand } from "../../src/commands/list";
+import { captureExec, commandIO } from "../utils";
 
 describe("start command", () => {
 	describe("argument validation", () => {
