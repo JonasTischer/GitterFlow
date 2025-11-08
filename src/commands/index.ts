@@ -1,12 +1,12 @@
 import { deleteCommand } from "./delete";
 import { helpCommand } from "./help";
 import { listCommand } from "./list";
-import { startCommand } from "./start";
+import { newCommand } from "./new";
 import type { CommandDefinition } from "./types";
 
 export const commandMap: Record<string, CommandDefinition> = {
 	help: helpCommand,
-	start: startCommand,
+	new: newCommand,
 	list: listCommand,
 	delete: deleteCommand,
 };
@@ -19,7 +19,7 @@ for (const definition of Object.values(commandMap)) {
 }
 
 export const orderedCommands: CommandDefinition[] = [
-	startCommand,
+	newCommand,
 	listCommand,
 	deleteCommand,
 	helpCommand,

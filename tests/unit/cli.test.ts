@@ -34,7 +34,7 @@ describe("GitterFlow CLI", () => {
 		expect(stderr).toHaveLength(0);
 		expect(stdout[0]).toBe(HELP_MESSAGE);
 		expect(stdout[1]).toContain("Available Commands");
-		expect(stdout[2]).toContain("gitterflow start <branch>");
+		expect(stdout[2]).toContain("gitterflow new [branch]");
 	});
 
 	test("prints help information for help aliases", async () => {

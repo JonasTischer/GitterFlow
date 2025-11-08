@@ -4,13 +4,14 @@ export const HELP_MESSAGE = `
 GitterFlow - Git Worktree Manager
 
 Usage:
-  gitterflow start <branch>   Create and check out a worktree
+  gitterflow new [branch]     Create a worktree (random name if not specified)
   gitterflow list             List all existing worktrees
   gitterflow delete <branch>  Remove a worktree
   gitterflow help             Show this help message
 
 Examples:
-  gitterflow start feature/new-feature
+  gitterflow new feature/new-feature
+  gitterflow new
   gitterflow list
   gitterflow delete feature/new-feature
 `.trim();

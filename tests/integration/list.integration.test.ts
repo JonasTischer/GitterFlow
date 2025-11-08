@@ -18,7 +18,7 @@ describe("list command (integration)", () => {
 	test("should list worktrees when there are some", async () => {
 		const { repoPath, cleanup } = await createTestRepo();
 		try {
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start feature/new-feature`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature/new-feature`.quiet();
 			const result =
 				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} list`.quiet();
 			expect(result.exitCode).toBe(0);

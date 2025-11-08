@@ -1,47 +1,81 @@
 import { describe, expect, test } from "bun:test";
-import { startCommand } from "../../../src/commands/start";
-import { captureExec, commandIO, noExec } from "../test-helpers";
+import { newCommand } from "../../../src/commands/new";
+import { captureExec, commandIO } from "../test-helpers";
 
-describe("start command", () => {
-	describe("argument validation", () => {
-		test("should fail when no branch name is provided", async () => {
-			const { io, stderrMessages } = commandIO();
+describe("new command", () => {
+	describe("random branch name generation", () => {
+		test("should generate random branch name when none provided", async () => {
+			const { exec, calls } = captureExec();
+			const { io, stdoutMessages } = commandIO();
 
-			const exitCode = await startCommand.run({
+			const exitCode = await newCommand.run({
 				args: [],
-				exec: noExec,
+				exec,
 				...io,
 			});
 
-			expect(exitCode).toBe(1);
-			expect(stderrMessages).toHaveLength(1);
-			expect(stderrMessages[0]).toContain("Please provide a branch name");
+			expect(exitCode).toBe(0);
+			expect(stdoutMessages).toHaveLength(1);
+			expect(stdoutMessages[0]).toContain("Created worktree");
+
+			// Should have created a worktree with some generated name
+			expect(calls).toHaveLength(1);
+			expect(calls[0]?.strings.join("")).toContain("git worktree add");
+			expect(calls[0]?.values).toHaveLength(2); // branch name and path
 		});
 
-		test("should fail when branch name is empty string", async () => {
-			const { io, stderrMessages } = commandIO();
+		test("should use empty string args as no branch name", async () => {
+			const { exec, calls } = captureExec();
+			const { io, stdoutMessages } = commandIO();
 
-			const exitCode = await startCommand.run({
+			const exitCode = await newCommand.run({
 				args: [""],
-				exec: noExec,
+				exec,
 				...io,
 			});
 
-			expect(exitCode).toBe(1);
-			expect(stderrMessages[0]).toContain("Please provide a branch name");
+			expect(exitCode).toBe(0);
+			expect(stdoutMessages).toHaveLength(1);
+			// Should have generated a random name
+			expect(calls).toHaveLength(1);
 		});
 
-		test("should fail when branch name is only whitespace", async () => {
-			const { io, stderrMessages } = commandIO();
+		test("should use whitespace-only args as no branch name", async () => {
+			const { exec, calls } = captureExec();
+			const { io, stdoutMessages } = commandIO();
 
-			const exitCode = await startCommand.run({
+			const exitCode = await newCommand.run({
 				args: ["   "],
-				exec: noExec,
+				exec,
 				...io,
 			});
 
-			expect(exitCode).toBe(1);
-			expect(stderrMessages[0]).toContain("Please provide a branch name");
+			expect(exitCode).toBe(0);
+			expect(stdoutMessages).toHaveLength(1);
+			// Should have generated a random name
+			expect(calls).toHaveLength(1);
+		});
+
+		test("should generate different names on multiple calls", async () => {
+			const names = new Set<string>();
+
+			for (let i = 0; i < 5; i++) {
+				const { exec, calls } = captureExec();
+				const { io } = commandIO();
+
+				await newCommand.run({
+					args: [],
+					exec,
+					...io,
+				});
+
+				const branchName = calls[0]?.values[0] as string;
+				names.add(branchName);
+			}
+
+			// Should have generated at least 4 different names out of 5
+			// (extremely unlikely to get duplicates with good random generation)
+			expect(names.size).toBeGreaterThanOrEqual(4);
 		});
 	});
 
@@ -50,7 +84,7 @@ describe("start command", () => {
 			const { exec, calls } = captureExec();
 			const { io, stdoutMessages, stderrMessages } = commandIO();
 
-			const exitCode = await startCommand.run({
+			const exitCode = await newCommand.run({
 				args: ["feature/new-feature"],
 				exec,
 				...io,
@@ -74,7 +108,7 @@ describe("start command", () => {
 			const { exec, calls } = captureExec();
 			const { io } = commandIO();
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["my-branch"],
 				exec,
 				...io,
@@ -95,7 +129,7 @@ describe("start command", () => {
 			const { exec, calls } = captureExec();
 			const { io, stdoutMessages } = commandIO();
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["feature/authentication"],
 				exec,
 				...io,
@@ -109,7 +143,7 @@ describe("start command", () => {
 			const { exec, calls } = captureExec();
 			const { io } = commandIO();
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["fix-bug-123"],
 				exec,
 				...io,
@@ -127,7 +161,7 @@ describe("start command", () => {
 				throw new Error("git worktree add failed");
 			};
 
-			const exitCode = await startCommand.run({
+			const exitCode = await newCommand.run({
 				args: ["test-branch"],
 				exec: failingExec,
 				...io,
@@ -149,7 +183,7 @@ describe("start command", () => {
 				throw error;
 			};
 
-			const exitCode = await startCommand.run({
+			const exitCode = await newCommand.run({
 				args: ["test-branch"],
 				exec: failingExec,
 				...io,
@@ -166,7 +200,7 @@ describe("start command", () => {
 				throw new Error("worktree '../test' already exists");
 			};
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["test"],
 				exec: failingExec,
 				...io,
@@ -183,7 +217,7 @@ describe("start command", () => {
 			const { exec, calls } = captureExec();
 			const { io } = commandIO();
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["feature-x"],
 				exec,
 				...io,
@@ -201,7 +235,7 @@ describe("start command", () => {
 			const { exec, calls } = captureExec();
 			const { io, stdoutMessages } = commandIO();
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["my-branch", "extra", "args"],
 				exec,
 				...io,
@@ -219,7 +253,7 @@ describe("start command", () => {
 			const { exec } = captureExec();
 			const { io, stdoutMessages } = commandIO();
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["feature/awesome"],
 				exec,
 				...io,
@@ -234,7 +268,7 @@ describe("start command", () => {
 			const { exec } = captureExec();
 			const { io, stdoutMessages } = commandIO();
 
-			await startCommand.run({
+			await newCommand.run({
 				args: ["test"],
 				exec,
 				...io,

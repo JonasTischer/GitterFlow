@@ -9,9 +9,9 @@ import {
 } from "./test-helpers";
 
 /**
- * Integration Tests: start command
+ * Integration Tests: new command
  *
- * These tests actually run git commands to verify the start command works
+ * These tests actually run git commands to verify the new command works
  * correctly in real-world scenarios. Unlike unit tests that mock git,
  * these tests:
  *
@@ -31,7 +31,7 @@ import {
  * 3. Is the new branch created?
  * 4. Is git state correct after creation?
  */
-describe("start command (integration)", () => {
+describe("new command (integration)", () => {
 	/**
 	 * Test: Basic worktree creation
 	 *
@@ -51,7 +51,7 @@ describe("start command (integration)", () => {
 
 			// Run the actual command from within the repo
 			const result =
-				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start test-feature`.quiet();
+				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new test-feature`.quiet();
 
 			// Verify command succeeded
 			expect(result.exitCode).toBe(0);
@@ -93,7 +93,7 @@ describe("start command (integration)", () => {
 			const parentDir = join(repoPath, "..");
 			const worktreePath = join(parentDir, "feature", "authentication");
 
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start feature/authentication`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature/authentication`.quiet();
 
 			// Verify worktree created (note: git creates nested directories)
 			const exists = await pathExists(worktreePath);
@@ -120,13 +120,13 @@ describe("start command (integration)", () => {
 			const parentDir = join(repoPath, "..");
 
 			// Create first worktree
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start feature-1`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature-1`.quiet();
 
 			// Create second worktree
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start feature-2`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature-2`.quiet();
 
 			// Create third worktree
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start feature-3`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature-3`.quiet();
 
 			// Verify all three exist (resolve paths for comparison)
 			const worktrees = await listWorktrees(repoPath);
@@ -160,11 +160,11 @@ describe("start command (integration)", () => {
 
 		try {
 			// Create worktree first time - should succeed
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start duplicate-branch`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new duplicate-branch`.quiet();
 
 			// Try to create same branch again - should fail
 			try {
-				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start duplicate-branch`;
+				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new duplicate-branch`;
 				// Should not reach here
 				expect(true).toBe(false); // Force failure if command succeeds
 			} catch (error) {
@@ -196,7 +196,7 @@ describe("start command (integration)", () => {
 			const worktreePath = join(parentDir, "new-feature");
 
 			// Create worktree
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start new-feature`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new new-feature`.quiet();
 
 			// Get commit hash of new worktree
 			const worktreeCommit = await $`git -C ${worktreePath} rev-parse HEAD`
@@ -224,7 +224,7 @@ describe("start command (integration)", () => {
 			const worktreePath = join(parentDir, "isolated-feature");
 
 			// Create worktree
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} start isolated-feature`.quiet();
+			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new isolated-feature`.quiet();
 
 			// Make a change in the worktree
 			await $`echo "worktree change" > ${worktreePath}/test.txt`.quiet();
@@ -238,6 +238,37 @@ describe("start command (integration)", () => {
 			// Verify main branch is still on original commit
 			const mainBranch = await getCurrentBranch(repoPath);
 			expect(mainBranch).toBe("main");
+		} finally {
+			await cleanup();
+		}
+	}, 10000);
+
+	/**
+	 * Test: Optional branch name with random generation
+	 *
+	 * When no branch name is provided, the command should generate
+	 * a random name and create a worktree with it.
+	 */
+	test("should create worktree with random name when no branch provided", async () => {
+		const { repoPath, cleanup } = await createTestRepo();
+
+		try {
+			const parentDir = join(repoPath, "..");
+
+			// Run command without branch name
+			const result =
+				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new`.quiet();
+
+			// Command should succeed
+			expect(result.exitCode).toBe(0);
+
+			// Should have created a worktree (verify we have more than just main repo)
+			const worktrees = await listWorktrees(repoPath);
+			expect(worktrees.length).toBeGreaterThan(1);
+
+			// Find the new worktree path (not the main repo)
+			const newWorktree = worktrees.find((path) => !path.endsWith(repoPath));
+			expect(newWorktree).toBeDefined();
 		} finally {
 			await cleanup();
 		}

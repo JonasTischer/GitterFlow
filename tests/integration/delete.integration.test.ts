@@ -34,7 +34,7 @@ describe("delete command (integration)", () => {
 			const cliPath = join(process.cwd(), "src/index.ts");
 
 			// Create a worktree first
-			await $`cd ${repoPath} && bun ${cliPath} start to-delete`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new to-delete`.quiet();
 
 			// Verify it exists
 			const existsBefore = await pathExists(worktreePath);
@@ -76,9 +76,9 @@ describe("delete command (integration)", () => {
 			const cliPath = join(process.cwd(), "src/index.ts");
 
 			// Create three worktrees
-			await $`cd ${repoPath} && bun ${cliPath} start feature-1`.quiet();
-			await $`cd ${repoPath} && bun ${cliPath} start feature-2`.quiet();
-			await $`cd ${repoPath} && bun ${cliPath} start feature-3`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new feature-1`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new feature-2`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new feature-3`.quiet();
 
 			// Delete the middle one
 			await $`cd ${repoPath} && bun ${cliPath} delete feature-2`.quiet();
@@ -154,7 +154,7 @@ describe("delete command (integration)", () => {
 			const cliPath = join(process.cwd(), "src/index.ts");
 
 			// Create worktree with slash in name
-			await $`cd ${repoPath} && bun ${cliPath} start feature/auth`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new feature/auth`.quiet();
 
 			// Verify it exists
 			const existsBefore = await pathExists(worktreePath);
@@ -189,7 +189,7 @@ describe("delete command (integration)", () => {
 			const cliPath = join(process.cwd(), "src/index.ts");
 
 			// Step 1: Create worktree
-			await $`cd ${repoPath} && bun ${cliPath} start workflow-test`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new workflow-test`.quiet();
 
 			// Step 2: Do some work (create file and commit)
 			await $`echo "test content" > ${worktreePath}/work.txt`.quiet();
@@ -229,7 +229,7 @@ describe("delete command (integration)", () => {
 			const cliPath = join(process.cwd(), "src/index.ts");
 
 			// Create worktree
-			await $`cd ${repoPath} && bun ${cliPath} start test-output`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new test-output`.quiet();
 
 			// Delete and capture output
 			const result =
