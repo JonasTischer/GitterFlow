@@ -47,7 +47,9 @@ export const newCommand: CommandDefinition = {
 
 		// Generate random branch name if none provided or if empty/whitespace
 		const trimmedBranch =
-			branch && branch.trim() !== "" ? branch.trim() : generateRandomBranchName();
+			branch && branch.trim() !== ""
+				? branch.trim()
+				: generateRandomBranchName();
 
 		try {
 			// Use -b flag to create a new branch in the worktree
