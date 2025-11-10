@@ -164,7 +164,7 @@ export const snapCommand: CommandDefinition = {
 			}
 
 			// Commit with the generated message
-			await run`git commit -m ${commitMessage}`;
+			await run`git commit -m ${commitMessage} --no-verify`;
 			stdout(`✅ Commit created: ${commitMessage}`);
 
 			return 0;
