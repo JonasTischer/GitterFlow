@@ -1,4 +1,5 @@
 import { deleteCommand } from "./delete";
+import { finishCommand } from "./finish";
 import { helpCommand } from "./help";
 import { initCommand } from "./init";
 import { listCommand } from "./list";
@@ -13,6 +14,7 @@ export const commandMap: Record<string, CommandDefinition> = {
 	list: listCommand,
 	delete: deleteCommand,
 	snap: snapCommand,
+	finish: finishCommand,
 };
 
 for (const definition of Object.values(commandMap)) {
@@ -28,5 +30,6 @@ export const orderedCommands: CommandDefinition[] = [
 	listCommand,
 	deleteCommand,
 	snapCommand,
+	finishCommand,
 	helpCommand,
 ];
