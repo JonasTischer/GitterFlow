@@ -98,7 +98,8 @@ describe("new command (integration)", () => {
 			const parentDir = join(repoPath, "..");
 			const worktreePath = join(parentDir, "feature", "authentication");
 
-			const result = await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature/authentication`.quiet();
+			const result =
+				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature/authentication`.quiet();
 
 			// Verify worktree created (note: git creates nested directories)
 			const exists = await pathExists(worktreePath);
