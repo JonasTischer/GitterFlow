@@ -1,8 +1,7 @@
-import { createInterface } from "node:readline";
 import { $ } from "bun";
 import { resolve } from "node:path";
 import { getSetting } from "../config";
-import type { CommandDefinition } from "./types";
+import type { CommandDefinition, CommandExecutor } from "./types";
 
 /**
  * Get the configured OpenRouter model from environment variable or config file
@@ -79,7 +78,7 @@ ${diff}`;
  * Commit any uncommitted changes (same logic as snap command)
  */
 async function commitUncommittedChanges(
-	run: typeof $,
+	run: CommandExecutor | typeof $,
 	stdout: (msg: string) => void,
 ): Promise<boolean> {
 	try {
@@ -141,7 +140,9 @@ async function commitUncommittedChanges(
 /**
  * Get current branch name
  */
-async function getCurrentBranch(run: typeof $): Promise<string> {
+async function getCurrentBranch(
+	run: CommandExecutor | typeof $,
+): Promise<string> {
 	const result = run`git rev-parse --abbrev-ref HEAD`;
 	let branch: string;
 	if (
@@ -154,7 +155,11 @@ async function getCurrentBranch(run: typeof $): Promise<string> {
 	} else {
 		const resolved = await result;
 		branch =
-			typeof resolved === "string" ? resolved.trim() : String(resolved).trim();
+			typeof resolved === "string"
+				? resolved.trim()
+				: resolved !== null && resolved !== undefined
+					? String(resolved).trim()
+					: "";
 	}
 	return branch;
 }
@@ -165,7 +170,7 @@ async function getCurrentBranch(run: typeof $): Promise<string> {
  * finally falls back to config base_branch
  */
 async function detectBaseBranch(
-	run: typeof $,
+	run: CommandExecutor | typeof $,
 	currentBranch: string,
 	configBaseBranch: string,
 ): Promise<string> {
@@ -185,7 +190,9 @@ async function detectBaseBranch(
 			storedBase =
 				typeof resolved === "string"
 					? resolved.trim()
-					: String(resolved).trim();
+					: resolved !== null && resolved !== undefined
+						? String(resolved).trim()
+						: "";
 		}
 
 		// Verify the stored base branch still exists
@@ -224,7 +231,9 @@ async function detectBaseBranch(
 					mergeBaseHash =
 						typeof resolved === "string"
 							? resolved.trim()
-							: String(resolved).trim();
+							: resolved !== null && resolved !== undefined
+								? String(resolved).trim()
+								: "";
 				}
 
 				// Get the base branch commit
@@ -242,17 +251,16 @@ async function detectBaseBranch(
 					baseCommitHash =
 						typeof resolved === "string"
 							? resolved.trim()
-							: String(resolved).trim();
+							: resolved !== null && resolved !== undefined
+								? String(resolved).trim()
+								: "";
 				}
 
 				// If merge base equals base branch commit, this is likely the base
 				if (mergeBaseHash === baseCommitHash) {
 					return branch;
 				}
-			} catch {
-				// Branch doesn't exist or other error, try next
-				continue;
-			}
+			} catch {}
 		}
 	} catch {
 		// Fall through to config default
@@ -266,7 +274,7 @@ async function detectBaseBranch(
  * Check if a branch exists (local or remote)
  */
 async function branchExists(
-	run: typeof $,
+	run: CommandExecutor | typeof $,
 	branch: string,
 	remote = false,
 ): Promise<boolean> {
@@ -340,11 +348,34 @@ export const finishCommand: CommandDefinition = {
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error ? error.message : String(error);
-				// If base branch is already checked out elsewhere, we need a different approach
-				if (
-					errorMessage.includes("already checked out") ||
-					errorMessage.includes("is already checked out")
-				) {
+				const errorObj = error as {
+					exitCode?: number;
+					stderr?: string | { toString(): string };
+				} | null;
+				const exitCode = errorObj?.exitCode;
+				const stderrOutput =
+					typeof errorObj?.stderr === "string"
+						? errorObj.stderr
+						: typeof errorObj?.stderr === "object" &&
+								errorObj.stderr !== null &&
+								"toString" in errorObj.stderr
+							? errorObj.stderr.toString()
+							: "";
+
+				// Combine error message and stderr for detection
+				const fullErrorText = `${errorMessage} ${stderrOutput}`.toLowerCase();
+
+				// Check if base branch is already checked out elsewhere
+				// This can happen in multiple languages (English, German, etc.)
+				const isAlreadyCheckedOut =
+					exitCode === 128 ||
+					fullErrorText.includes("already checked out") ||
+					fullErrorText.includes("is already checked out") ||
+					fullErrorText.includes("bereits ausgecheckt") ||
+					fullErrorText.includes("ist bereits") ||
+					fullErrorText.includes("bereits in");
+
+				if (isAlreadyCheckedOut) {
 					stderr(
 						`\n⚠️  ${baseBranch} is already checked out elsewhere (likely in main repo).`,
 					);
@@ -373,7 +404,7 @@ export const finishCommand: CommandDefinition = {
 				stdout(`📥 Pulling latest changes for ${baseBranch}...`);
 				try {
 					await run`git pull origin ${baseBranch}`;
-				} catch (error) {
+				} catch {
 					// If pull fails, it might be because the branch doesn't exist remotely yet
 					// That's okay, we'll continue
 					stdout(
@@ -415,7 +446,6 @@ export const finishCommand: CommandDefinition = {
 
 			// Step 9: Cleanup options
 			const deleteRemoteOnFinish = getSetting("delete_remote_on_finish");
-			const worktreesDir = getSetting("worktrees_dir");
 
 			stdout(`\n🧹 Cleanup options:`);
 			stdout(`   Delete remote branch: ${deleteRemoteOnFinish ? "Yes" : "No"}`);
