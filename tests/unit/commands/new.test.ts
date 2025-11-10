@@ -21,10 +21,10 @@ describe("new command", () => {
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
 
-			// Should have created a worktree with some generated name
-			expect(calls).toHaveLength(1);
-			expect(calls[0]?.strings.join("")).toContain("git worktree add");
-			expect(calls[0]?.values).toHaveLength(2); // branch name and path
+			// Should have made 3 git calls: rev-parse, worktree add, config
+			expect(calls).toHaveLength(3);
+			expect(calls[1]?.strings.join("")).toContain("git worktree add");
+			expect(calls[1]?.values).toHaveLength(2); // branch name and path
 		});
 
 		test("should use empty string args as no branch name", async () => {
@@ -39,8 +39,8 @@ describe("new command", () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdoutMessages).toHaveLength(4);
-			// Should have generated a random name
-			expect(calls).toHaveLength(1);
+			// Should have made 3 git calls: rev-parse, worktree add, config
+			expect(calls).toHaveLength(3);
 		});
 
 		test("should use whitespace-only args as no branch name", async () => {
@@ -55,8 +55,8 @@ describe("new command", () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdoutMessages).toHaveLength(4);
-			// Should have generated a random name
-			expect(calls).toHaveLength(1);
+			// Should have made 3 git calls: rev-parse, worktree add, config
+			expect(calls).toHaveLength(3);
 		});
 
 		test("should generate different names on multiple calls", async () => {
@@ -72,7 +72,8 @@ describe("new command", () => {
 					...io,
 				});
 
-				const branchName = calls[0]?.values[0] as string;
+				// Second call is the git worktree add command
+				const branchName = calls[1]?.values[0] as string;
 				names.add(branchName);
 			}
 
@@ -103,11 +104,11 @@ describe("new command", () => {
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
 
-			// Should use -b flag to create new branch
-			expect(calls).toHaveLength(1);
-			expect(calls[0]?.strings.join("")).toContain("git worktree add");
-			expect(calls[0]?.strings.join("")).toContain("-b");
-			expect(calls[0]?.values).toContain("feature/new-feature");
+			// Should have made 3 git calls: rev-parse, worktree add, config
+			expect(calls).toHaveLength(3);
+			expect(calls[1]?.strings.join("")).toContain("git worktree add");
+			expect(calls[1]?.strings.join("")).toContain("-b");
+			expect(calls[1]?.values).toContain("feature/new-feature");
 		});
 
 		test("should use correct worktree path in parent directory", async () => {
@@ -120,9 +121,9 @@ describe("new command", () => {
 				...io,
 			});
 
-			// Path should be ../my-branch
-			const commandStr = calls[0]?.strings.join("{{VALUE}}") ?? "";
-			const fullCommand = calls[0]?.values.reduce(
+			// Path should be ../my-branch (second call is git worktree add)
+			const commandStr = calls[1]?.strings.join("{{VALUE}}") ?? "";
+			const fullCommand = calls[1]?.values.reduce(
 				(cmd: string, val: unknown, _idx: number) =>
 					cmd.replace("{{VALUE}}", String(val)),
 				commandStr,
@@ -145,7 +146,8 @@ describe("new command", () => {
 			expect(stdoutMessages[1]).toContain("Switched to");
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
-			expect(calls[0]?.values).toContain("feature/authentication");
+			// Second call is git worktree add
+			expect(calls[1]?.values).toContain("feature/authentication");
 		});
 
 		test("should handle branch names with hyphens", async () => {
@@ -158,7 +160,8 @@ describe("new command", () => {
 				...io,
 			});
 
-			expect(calls[0]?.values).toContain("fix-bug-123");
+			// Second call is git worktree add
+			expect(calls[1]?.values).toContain("fix-bug-123");
 		});
 	});
 
@@ -234,8 +237,9 @@ describe("new command", () => {
 
 			// The worktree should be created from HEAD (current branch)
 			// git worktree add -b feature-x ../feature-x
-			expect(calls).toHaveLength(1);
-			const cmd = calls[0]?.strings.join("").trim() ?? "";
+			expect(calls).toHaveLength(3);
+			// Second call is git worktree add
+			const cmd = calls[1]?.strings.join("").trim() ?? "";
 			expect(cmd).toContain("git worktree add");
 			expect(cmd).toContain("-b");
 		});
@@ -256,7 +260,8 @@ describe("new command", () => {
 			expect(stdoutMessages[1]).toContain("Switched to");
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
-			expect(calls[0]?.values).toContain("my-branch");
+			// Second call is git worktree add
+			expect(calls[1]?.values).toContain("my-branch");
 		});
 	});
 

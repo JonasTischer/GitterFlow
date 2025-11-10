@@ -397,4 +397,474 @@ describe("delete command", () => {
 			expect(stdoutMessages[0]).toContain("🗑");
 		});
 	});
+
+	/**
+	 * Test Group: --all Flag
+	 *
+	 * Purpose: Verify the --all flag correctly deletes all worktrees
+	 */
+	describe("--all flag", () => {
+		/**
+		 * Test: --all flag detection
+		 *
+		 * Scenario: User provides --all flag
+		 * Expected: Command should detect flag and list all worktrees
+		 */
+		test("should detect --all flag", async () => {
+			const { exec, calls } = captureExec();
+			const { io } = commandIO();
+
+			// Mock git worktree list output
+			const mockWorktreeList = `/path/to/repo  abc123 [main]
+/path/to/worktree1  def456 [feature-1]
+/path/to/worktree2  ghi789 [feature-2]`;
+
+			const execWithMock = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git worktree list")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mockWorktreeList,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git rev-parse --show-toplevel")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => "/path/to/repo",
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				return Promise.resolve({});
+			};
+
+			await deleteCommand.run({
+				args: ["--all"],
+				exec: execWithMock,
+				...io,
+			});
+
+			// Should call git worktree list
+			expect(calls.some((c) => c.strings.join("").includes("git worktree list"))).toBe(
+				true,
+			);
+		});
+
+		/**
+		 * Test: -a short flag
+		 *
+		 * Scenario: User provides -a as short form
+		 * Expected: Should work same as --all
+		 */
+		test("should detect -a short flag", async () => {
+			const { exec, calls } = captureExec();
+			const { io } = commandIO();
+
+			const mockWorktreeList = `/path/to/repo  abc123 [main]
+/path/to/worktree1  def456 [feature-1]`;
+
+			const execWithMock = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git worktree list")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mockWorktreeList,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git rev-parse --show-toplevel")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => "/path/to/repo",
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				return Promise.resolve({});
+			};
+
+			await deleteCommand.run({
+				args: ["-a"],
+				exec: execWithMock,
+				...io,
+			});
+
+			// Should call git worktree list
+			expect(calls.some((c) => c.strings.join("").includes("git worktree list"))).toBe(
+				true,
+			);
+		});
+
+		/**
+		 * Test: Exclude main repo from deletion
+		 *
+		 * Scenario: Worktree list includes main repo
+		 * Expected: Main repo should be excluded from deletion list
+		 */
+		test("should exclude main repo from deletion", async () => {
+			const { exec, calls } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			const mainRepoPath = "/path/to/repo";
+			const mockWorktreeList = `${mainRepoPath}  abc123 [main]
+/path/to/worktree1  def456 [feature-1]
+/path/to/worktree2  a1b2c3 [feature-2]`;
+
+			const execWithMock = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git worktree list")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mockWorktreeList,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git rev-parse --show-toplevel")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mainRepoPath,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				// For git worktree remove, just return success
+				if (command.includes("git worktree remove")) {
+					return Promise.resolve({});
+				}
+
+				return Promise.resolve({});
+			};
+
+			await deleteCommand.run({
+				args: ["--all"],
+				exec: execWithMock,
+				...io,
+			});
+
+			// Should list 2 worktrees to delete (excluding main)
+			const foundMessage = stdoutMessages.find((msg) =>
+				msg.includes("Found 2 worktree(s)"),
+			);
+			expect(foundMessage).toBeDefined();
+
+			// Should not try to delete main repo
+			const deleteCalls = calls.filter((c) =>
+				c.strings.join("").includes("git worktree remove"),
+			);
+			expect(deleteCalls.length).toBe(2); // Only 2 deletions, not 3
+			// Check that main repo path is not in any of the delete call values
+			const mainRepoInValues = deleteCalls.some((c) =>
+				c.values.some((v) => String(v).includes(mainRepoPath)),
+			);
+			expect(mainRepoInValues).toBe(false);
+		});
+
+		/**
+		 * Test: Delete multiple worktrees
+		 *
+		 * Scenario: Multiple worktrees exist
+		 * Expected: All should be deleted (except main repo)
+		 */
+		test("should delete all worktrees", async () => {
+			const { exec, calls } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			const mainRepoPath = "/path/to/repo";
+			const mockWorktreeList = `${mainRepoPath}  abc123 [main]
+/path/to/worktree1  def456 [feature-1]
+/path/to/worktree2  a1b2c3 [feature-2]
+/path/to/worktree3  d4e5f6 [feature-3]`;
+
+			const execWithMock = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git worktree list")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mockWorktreeList,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git rev-parse --show-toplevel")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mainRepoPath,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				// For git worktree remove, just return success
+				if (command.includes("git worktree remove")) {
+					return Promise.resolve({});
+				}
+
+				return Promise.resolve({});
+			};
+
+			await deleteCommand.run({
+				args: ["--all"],
+				exec: execWithMock,
+				...io,
+			});
+
+			// Should delete 3 worktrees (excluding main repo)
+			const deleteCalls = calls.filter((c) =>
+				c.strings.join("").includes("git worktree remove"),
+			);
+			expect(deleteCalls.length).toBe(3);
+
+			// Should show success count
+			const successMessage = stdoutMessages.find((msg) =>
+				msg.includes("Deleted 3 worktree(s)"),
+			);
+			expect(successMessage).toBeDefined();
+		});
+
+		/**
+		 * Test: Empty worktree list
+		 *
+		 * Scenario: No worktrees exist (only main repo)
+		 * Expected: Should show message and exit successfully
+		 */
+		test("should handle empty worktree list gracefully", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			const mainRepoPath = "/path/to/repo";
+			const mockWorktreeList = `${mainRepoPath}  abc123 [main]`;
+
+			const execWithMock = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				const command = strings.join("");
+
+				if (command.includes("git worktree list")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mockWorktreeList,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git rev-parse --show-toplevel")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mainRepoPath,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				return Promise.resolve({});
+			};
+
+			const exitCode = await deleteCommand.run({
+				args: ["--all"],
+				exec: execWithMock,
+				...io,
+			});
+
+			expect(exitCode).toBe(0);
+			const noWorktreesMessage = stdoutMessages.find((msg) =>
+				msg.includes("No worktrees to delete") ||
+				msg.includes("only main repository found"),
+			);
+			expect(noWorktreesMessage).toBeDefined();
+		});
+
+		/**
+		 * Test: Partial deletion failure
+		 *
+		 * Scenario: Some worktrees fail to delete
+		 * Expected: Should continue deleting others and report failures
+		 */
+		test("should handle partial deletion failures", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages, stderrMessages } = commandIO();
+
+			const mainRepoPath = "/path/to/repo";
+			const mockWorktreeList = `${mainRepoPath}  abc123 [main]
+/path/to/worktree1  def456 [feature-1]
+/path/to/worktree2  a1b2c3 [feature-2]`;
+
+			let deleteCallCount = 0;
+			const execWithMock = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				const command = strings.join("");
+
+				if (command.includes("git worktree list")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mockWorktreeList,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git rev-parse --show-toplevel")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mainRepoPath,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git worktree remove")) {
+					deleteCallCount++;
+					// Fail on second deletion
+					if (deleteCallCount === 2) {
+						throw new Error("Failed to remove worktree2");
+					}
+				}
+
+				return Promise.resolve({});
+			};
+
+			const exitCode = await deleteCommand.run({
+				args: ["--all"],
+				exec: execWithMock,
+				...io,
+			});
+
+			// Should return error code due to failures
+			expect(exitCode).toBe(1);
+
+			// Should show success count
+			const successMessage = stdoutMessages.find((msg) =>
+				msg.includes("Deleted 1 worktree(s)"),
+			);
+			expect(successMessage).toBeDefined();
+
+			// Should show failure count
+			const failureMessage = stderrMessages.find((msg) =>
+				msg.includes("Failed to delete 1 worktree(s)"),
+			);
+			expect(failureMessage).toBeDefined();
+		});
+
+		/**
+		 * Test: List worktrees failure
+		 *
+		 * Scenario: git worktree list fails
+		 * Expected: Should show error and exit with code 1
+		 */
+		test("should handle git worktree list failure", async () => {
+			const { io, stderrMessages } = commandIO();
+
+			const failingExec = async () => {
+				throw new Error("git worktree list failed");
+			};
+
+			const exitCode = await deleteCommand.run({
+				args: ["--all"],
+				exec: failingExec,
+				...io,
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stderrMessages[0]).toContain("Failed to list worktrees");
+		});
+
+		/**
+		 * Test: Display worktree list before deletion
+		 *
+		 * Scenario: User runs --all
+		 * Expected: Should show which worktrees will be deleted
+		 */
+		test("should display worktrees to be deleted", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			const mainRepoPath = "/path/to/repo";
+			const mockWorktreeList = `${mainRepoPath}  abc123 [main]
+/path/to/worktree1  def456 [feature-1]
+/path/to/worktree2  a1b2c3 [feature-2]`;
+
+			const execWithMock = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				const command = strings.join("");
+
+				if (command.includes("git worktree list")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mockWorktreeList,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				if (command.includes("git rev-parse --show-toplevel")) {
+					const mockResult: { text: () => Promise<string> } = {
+						text: async () => mainRepoPath,
+					};
+					return Object.assign(Promise.resolve(mockResult), mockResult) as
+						| Promise<{ text: () => Promise<string> }>
+						| { text: () => Promise<string> };
+				}
+
+				// For git worktree remove, just return success
+				if (command.includes("git worktree remove")) {
+					return Promise.resolve({});
+				}
+
+				return Promise.resolve({});
+			};
+
+			await deleteCommand.run({
+				args: ["--all"],
+				exec: execWithMock,
+				...io,
+			});
+
+			// Should show list of worktrees to delete
+			const listMessage = stdoutMessages.find((msg) =>
+				msg.includes("Found 2 worktree(s) to delete"),
+			);
+			expect(listMessage).toBeDefined();
+
+			// Should list each worktree (check in the combined stdout messages)
+			const allMessages = stdoutMessages.join("\n");
+			expect(allMessages).toContain("feature-1");
+			expect(allMessages).toContain("feature-2");
+		});
+	});
 });

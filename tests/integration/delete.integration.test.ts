@@ -245,4 +245,167 @@ describe("delete command (integration)", () => {
 			await cleanup();
 		}
 	}, 10000);
+
+	/**
+	 * Test: Delete all worktrees with --all flag
+	 *
+	 * Verify that --all flag deletes all worktrees except main repo
+	 */
+	test("should delete all worktrees with --all flag", async () => {
+		const { repoPath, cleanup } = await createTestRepo();
+
+		try {
+			const parentDir = join(repoPath, "..");
+			const cliPath = join(process.cwd(), "src/index.ts");
+
+			// Create multiple worktrees
+			await $`cd ${repoPath} && bun ${cliPath} new all-test-1`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new all-test-2`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new all-test-3`.quiet();
+
+			// Verify they exist
+			const worktreesBefore = await listWorktrees(repoPath);
+			expect(worktreesBefore.length).toBeGreaterThanOrEqual(3);
+
+			// Delete all worktrees
+			const result =
+				await $`cd ${repoPath} && bun ${cliPath} delete --all`.quiet();
+
+			expect(result.exitCode).toBe(0);
+
+			// Verify all worktrees are removed
+			const worktreesAfter = await listWorktrees(repoPath);
+			// Should only have main repo left
+			expect(worktreesAfter.length).toBe(1);
+
+			// Verify directories are gone
+			const path1 = join(parentDir, "all-test-1");
+			const path2 = join(parentDir, "all-test-2");
+			const path3 = join(parentDir, "all-test-3");
+
+			expect(await pathExists(path1)).toBe(false);
+			expect(await pathExists(path2)).toBe(false);
+			expect(await pathExists(path3)).toBe(false);
+		} finally {
+			await cleanup();
+		}
+	}, 15000);
+
+	/**
+	 * Test: --all flag should not delete main repo
+	 *
+	 * Verify that main repository worktree is excluded from deletion
+	 */
+	test("should not delete main repo when using --all", async () => {
+		const { repoPath, cleanup } = await createTestRepo();
+
+		try {
+			const cliPath = join(process.cwd(), "src/index.ts");
+
+			// Create a worktree
+			await $`cd ${repoPath} && bun ${cliPath} new temp-worktree`.quiet();
+
+			// Delete all worktrees
+			await $`cd ${repoPath} && bun ${cliPath} delete --all`.quiet();
+
+			// Verify main repo still exists
+			const mainRepoExists = await pathExists(repoPath);
+			expect(mainRepoExists).toBe(true);
+
+			// Verify main repo is still a valid git repo
+			const gitStatus = await $`git -C ${repoPath} status`.quiet();
+			expect(gitStatus.exitCode).toBe(0);
+		} finally {
+			await cleanup();
+		}
+	}, 10000);
+
+	/**
+	 * Test: --all with no worktrees
+	 *
+	 * When only main repo exists, should show message and exit successfully
+	 */
+	test("should handle --all when no worktrees exist", async () => {
+		const { repoPath, cleanup } = await createTestRepo();
+
+		try {
+			const cliPath = join(process.cwd(), "src/index.ts");
+
+			// Delete all (should find no worktrees to delete)
+			const result =
+				await $`cd ${repoPath} && bun ${cliPath} delete --all`;
+
+			const stdout = result.stdout.toString();
+
+			// Should show message about no worktrees
+			expect(stdout).toContain("No worktrees to delete");
+			expect(result.exitCode).toBe(0);
+		} finally {
+			await cleanup();
+		}
+	}, 10000);
+
+	/**
+	 * Test: --all flag output messages
+	 *
+	 * Verify that --all shows proper progress messages
+	 */
+	test("should display proper messages when using --all", async () => {
+		const { repoPath, cleanup } = await createTestRepo();
+
+		try {
+			const cliPath = join(process.cwd(), "src/index.ts");
+
+			// Create worktrees
+			await $`cd ${repoPath} && bun ${cliPath} new msg-test-1`.quiet();
+			await $`cd ${repoPath} && bun ${cliPath} new msg-test-2`.quiet();
+
+			// Delete all and capture output
+			const result = await $`cd ${repoPath} && bun ${cliPath} delete --all`;
+
+			const stdout = result.stdout.toString();
+
+			// Should show list of worktrees to delete
+			expect(stdout).toContain("Found");
+			expect(stdout).toContain("worktree(s) to delete");
+
+			// Should show deletion progress
+			expect(stdout).toContain("Removed worktree");
+			expect(stdout).toContain("msg-test-1");
+			expect(stdout).toContain("msg-test-2");
+
+			// Should show final count
+			expect(stdout).toContain("Deleted 2 worktree(s)");
+		} finally {
+			await cleanup();
+		}
+	}, 10000);
+
+	/**
+	 * Test: --all with -a short form
+	 *
+	 * Verify that -a works the same as --all
+	 */
+	test("should accept -a as short form for --all", async () => {
+		const { repoPath, cleanup } = await createTestRepo();
+
+		try {
+			const parentDir = join(repoPath, "..");
+			const cliPath = join(process.cwd(), "src/index.ts");
+
+			// Create worktree
+			await $`cd ${repoPath} && bun ${cliPath} new short-flag-test`.quiet();
+
+			// Delete using -a flag
+			const result = await $`cd ${repoPath} && bun ${cliPath} delete -a`.quiet();
+
+			expect(result.exitCode).toBe(0);
+
+			// Verify worktree is deleted
+			const worktreePath = join(parentDir, "short-flag-test");
+			expect(await pathExists(worktreePath)).toBe(false);
+		} finally {
+			await cleanup();
+		}
+	}, 10000);
 });

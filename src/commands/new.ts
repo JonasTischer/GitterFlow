@@ -58,20 +58,23 @@ export const newCommand: CommandDefinition = {
 			// Get the current branch (this will be the base branch for the new worktree)
 			const run = exec ?? $;
 			const currentBranchResult = run`git rev-parse --abbrev-ref HEAD`;
+
+			// First await the result to handle Promises
+			const awaitedResult = await currentBranchResult;
+
 			let currentBranch: string;
 			if (
-				typeof currentBranchResult === "object" &&
-				currentBranchResult !== null &&
-				"text" in currentBranchResult &&
-				typeof currentBranchResult.text === "function"
+				typeof awaitedResult === "object" &&
+				awaitedResult !== null &&
+				"text" in awaitedResult &&
+				typeof awaitedResult.text === "function"
 			) {
-				currentBranch = (await currentBranchResult.text()).trim();
+				currentBranch = (await awaitedResult.text()).trim();
 			} else {
-				const resolved = await currentBranchResult;
 				currentBranch =
-					typeof resolved === "string"
-						? resolved.trim()
-						: String(resolved).trim();
+					typeof awaitedResult === "string"
+						? awaitedResult.trim()
+						: String(awaitedResult).trim();
 			}
 
 			// Use -b flag to create a new branch in the worktree

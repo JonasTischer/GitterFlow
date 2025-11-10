@@ -29,15 +29,13 @@ const captureExec = () => {
 			values,
 		});
 
-		// Return mock result that supports .text() for git diff commands
+		// Return mock result that supports .text() for various git commands
 		const command = strings.join("");
+
 		if (command.includes("git diff --cached")) {
-			// Create a mock object that supports .text() method chaining
-			// Bun's $ API: run`command`.text() - the template literal returns an object with .text()
 			const mockResult: { text: () => Promise<string> } = {
 				text: async () => "diff --git a/test.txt b/test.txt\n+new content",
 			};
-			// Return as both a promise and an object with .text() method
 			return Object.assign(
 				Promise.resolve(mockResult),
 				mockResult,
@@ -45,6 +43,43 @@ const captureExec = () => {
 				text: () => Promise<string>;
 			};
 		}
+
+		if (command.includes("git rev-parse --abbrev-ref HEAD")) {
+			const mockResult: { text: () => Promise<string> } = {
+				text: async () => "main",
+			};
+			return Object.assign(
+				Promise.resolve(mockResult),
+				mockResult,
+			) as unknown as Promise<{ text: () => Promise<string> }> & {
+				text: () => Promise<string>;
+			};
+		}
+
+		if (command.includes("git rev-parse --show-toplevel")) {
+			const mockResult: { text: () => Promise<string> } = {
+				text: async () => "/test/repo",
+			};
+			return Object.assign(
+				Promise.resolve(mockResult),
+				mockResult,
+			) as unknown as Promise<{ text: () => Promise<string> }> & {
+				text: () => Promise<string>;
+			};
+		}
+
+		if (command.includes("git worktree list")) {
+			const mockResult: { text: () => Promise<string> } = {
+				text: async () => "",
+			};
+			return Object.assign(
+				Promise.resolve(mockResult),
+				mockResult,
+			) as unknown as Promise<{ text: () => Promise<string> }> & {
+				text: () => Promise<string>;
+			};
+		}
+
 		return Promise.resolve({});
 	};
 
