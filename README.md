@@ -19,14 +19,14 @@ bun link
 ### Usage
 
 ```bash
-# Show help
-gitterflow help
+# Initialize configuration (interactive setup wizard)
+gitterflow init
 
 # Create a new worktree (with optional branch name)
-# Automatically opens a new terminal window/tab in the worktree directory
+# Automatically opens terminal/IDE in the worktree directory
 gitterflow new [branch-name]
 
-# List active worktrees
+# List active worktrees (interactive selector)
 gitterflow list
 
 # Delete a worktree
@@ -34,9 +34,27 @@ gitterflow delete [branch-name]
 
 # Automatically commit changes with AI-generated commit message
 gitterflow snap [--no-confirm]
+
+# Finish work: merge branch, push, and clean up
+gitterflow finish
 ```
 
-**Note:** The `new` command automatically opens a new terminal window/tab in the created worktree directory.
+**Note:** The `new` command automatically opens a new terminal window/tab or IDE in the created worktree directory (configurable).
+
+### Configuration
+
+Run `gitterflow init` to interactively set up your configuration, or manually create `.gitterflow.yaml`:
+
+```yaml
+base_branch: main
+worktrees_dir: ../worktrees
+ai_model: qwen/qwen3-235b-a22b-2507
+open_terminal: true
+delete_remote_on_finish: false
+coding_agent: claude
+terminal: iterm
+ide: cursor  # Optional: cursor, code, or custom IDE name
+```
 
 **Configuring Terminal:**
 
@@ -62,9 +80,26 @@ You can configure which terminal to use in three ways:
 - **Linux**: `gnome-terminal`
 - **Windows**: `windows-terminal` (Windows Terminal), `cmd` (Command Prompt)
 
+**Configuring IDE:**
+
+You can configure an IDE to open instead of (or alongside) a terminal:
+
+1. **Config file** (`.gitterflow.yaml`):
+   ```yaml
+   ide: cursor  # Options: cursor, code, vscode, or custom IDE name
+   open_terminal: true  # Can open both IDE and terminal
+   ```
+
+2. **Supported IDEs:**
+   - **Cursor**: Opens Cursor with integrated terminal
+   - **VS Code**: Opens Visual Studio Code with integrated terminal
+   - **Custom**: Any IDE name/command that can be launched from CLI
+
+When an IDE is configured, it will open with an integrated terminal running your coding agent. You can also configure both IDE and terminal to open simultaneously.
+
 **Configuring Coding Agent:**
 
-The command automatically runs a coding agent in the new terminal. Configure it via:
+The command automatically runs a coding agent in the new terminal/IDE. Configure it via:
 
 1. **Environment variable**:
    ```bash
@@ -73,14 +108,14 @@ The command automatically runs a coding agent in the new terminal. Configure it 
 
 2. **Config file** (`.gitterflow.yaml`):
    ```yaml
-   codingAgent: codex  # or "claude", "cursor", or any custom command
+   coding_agent: codex  # or "claude", "cursor", or any custom command
    ```
 
 3. **Default**: `claude` (if not configured)
 
-The terminal will automatically navigate to the worktree directory and run your configured coding agent command.
+The terminal/IDE will automatically navigate to the worktree directory and run your configured coding agent command.
 
-If terminal spawning fails or is unavailable, the command outputs the `cd` and agent commands you can run manually.
+If terminal/IDE spawning fails or is unavailable, the command outputs the `cd` and agent commands you can run manually.
 
 **Configuring OpenRouter Model (for `snap` command):**
 
@@ -93,15 +128,74 @@ The `snap` command uses OpenRouter API to generate commit messages. Configure th
 
 2. **Config file** (`.gitterflow.yaml`):
    ```yaml
-   openRouterModel: qwen/qwen3-235b-a22b-2507  # or "anthropic/claude-3.5-sonnet" or any OpenRouter model
+   ai_model: qwen/qwen3-235b-a22b-2507  # or "anthropic/claude-3.5-sonnet" or any OpenRouter model
    ```
 
-3. **Default**: `anthropic/claude-3.5-sonnet` (if not configured)
+3. **Default**: `qwen/qwen3-235b-a22b-2507` (if not configured)
 
 **Note:** You need to set `OPENROUTER_API_KEY` environment variable to use the `snap` command.
 
-## Development
+**Commit Message Confirmation:**
 
+When using `snap`, you'll see an interactive prompt:
+- Press **y** → Commit with the generated message (no Enter needed)
+- Press **e** → Edit the commit message before committing
+- Press **n** → Cancel the commit
+
+## Commands Reference
+
+### `gitterflow init`
+
+Interactive setup wizard that creates `.gitterflow.yaml` configuration file.
+
+- Checks if config already exists and asks to overwrite
+- Prompts for base branch, worktrees directory, AI model, terminal/IDE preferences
+- Optionally creates shell alias (e.g., `gf` for `gitterflow`)
+
+### `gitterflow new [branch-name]`
+
+Creates a new git worktree with an optional branch name. If no branch name is provided, generates a random name.
+
+- Creates worktree in parent directory (e.g., `../branch-name`)
+- Opens terminal/IDE in the worktree directory
+- Runs configured coding agent automatically
+
+### `gitterflow list`
+
+Lists all active worktrees with an interactive selector.
+
+- Shows all worktrees with branch names and paths
+- Navigate with arrow keys, select with Enter
+- Opens terminal/IDE in the selected worktree
+
+### `gitterflow delete <branch-name>`
+
+Removes a worktree for the specified branch.
+
+- Deletes the worktree directory
+- Removes the git worktree reference
+
+### `gitterflow snap [--no-confirm]`
+
+Automatically commits staged or modified changes with an AI-generated commit message.
+
+- Stages all changes (`git add -A`)
+- Generates commit message using OpenRouter API
+- Interactive confirmation: **y** (yes), **e** (edit), **n** (cancel)
+- Commits with `--no-verify` flag
+
+### `gitterflow finish`
+
+Completes work on a feature branch by merging it into the base branch.
+
+- Commits any uncommitted changes (using `snap` logic)
+- Checks out base branch and pulls latest changes
+- Merges feature branch into base branch
+- Pushes updated base branch to origin
+- Optionally deletes local/remote branches and removes worktree
+- Aborts if already on base branch
+
+## Development
 
 ## Setting Up Development Environment
 
@@ -185,15 +279,23 @@ GitterFlow/
 ├── src/
 │   ├── index.ts              # CLI entry point (shebang)
 │   ├── cli.ts                # Command dispatcher and shared CLI wiring
-│   └── commands/             # Command implementations and types
-│       ├── delete.ts
-│       ├── help.ts
-│       ├── index.ts
-│       ├── list.ts
-│       ├── start.ts
-│       └── types.ts
+│   ├── config.ts             # Configuration loader
+│   ├── commands/             # Command implementations
+│   │   ├── delete.ts
+│   │   ├── finish.ts
+│   │   ├── help.ts
+│   │   ├── init.ts
+│   │   ├── list.ts
+│   │   ├── new.ts
+│   │   ├── snap.ts
+│   │   ├── index.ts
+│   │   └── types.ts
+│   └── utils/                # Shared utilities
+│       ├── terminal.ts       # Terminal spawning
+│       └── ide.ts            # IDE opening
 ├── tests/
-│   └── cli.test.ts           # CLI and command contract tests
+│   ├── unit/                 # Unit tests
+│   └── integration/          # Integration tests
 ├── .github/workflows/        # CI/CD workflows
 ├── bunfig.toml              # Bun configuration
 └── gitterflow-cli-spec.md   # Detailed specification
@@ -218,23 +320,27 @@ GitHub Actions automatically:
 - [x] Basic CLI structure with help command
 - [x] Test setup with TDD workflow
 - [x] CI/CD pipeline
-- [ ] Config loader for `.gitterflow.yaml`
+- [x] Config loader for `.gitterflow.yaml`
 - [ ] Metadata storage system
 - [ ] Port allocation utility
 
-### Phase 1: Core Commands (In Progress)
-- [ ] `gf create` - Worktree creation + tmux setup
-- [ ] `gf ship` - Commit, push, merge workflow
-- [ ] `gf list` - Display worktrees
-- [ ] `gf cleanup` - Manual cleanup
+### Phase 1: Core Commands ✅
+- [x] `gitterflow init` - Interactive configuration setup
+- [x] `gitterflow new` - Worktree creation with terminal/IDE support
+- [x] `gitterflow list` - Interactive worktree listing
+- [x] `gitterflow delete` - Worktree removal
+- [x] `gitterflow snap` - AI-generated commit messages
+- [x] `gitterflow finish` - Merge workflow and cleanup
 
-### Phase 2: Shipping Workflow
+### Phase 2: Enhancements
+- [x] IDE support (Cursor, VS Code)
+- [x] Interactive commit message editing
+- [x] Shell alias creation
 - [ ] Fast-forward merge validation
-- [ ] Automatic cleanup after ship
-- [ ] Error handling and recovery
+- [ ] Error handling and recovery improvements
 
 ### Phase 3: Polish
-- [ ] Comprehensive test coverage
+- [x] Comprehensive test coverage
 - [ ] Window mode support
 - [ ] Shell completion scripts
 
@@ -242,7 +348,7 @@ GitHub Actions automatically:
 
 - [Bun](https://bun.sh) 1.3+
 - Git 2.0+
-- tmux (for headless mode)
+- `OPENROUTER_API_KEY` environment variable (for `snap` command)
 
 ## License
 
