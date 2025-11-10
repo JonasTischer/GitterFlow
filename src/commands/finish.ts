@@ -160,16 +160,49 @@ async function getCurrentBranch(run: typeof $): Promise<string> {
 }
 
 /**
- * Detect base branch - try to find the branch from which this worktree was created
- * Falls back to config base_branch
+ * Detect base branch - first check git config for stored base branch,
+ * then try to find the branch from which this worktree was created,
+ * finally falls back to config base_branch
  */
 async function detectBaseBranch(
 	run: typeof $,
 	currentBranch: string,
 	configBaseBranch: string,
 ): Promise<string> {
+	// First, check if we stored the base branch in git config
 	try {
-		// Try to find the merge base with common branches
+		const storedBaseResult = run`git config branch.${currentBranch}.gitterflow-base-branch`;
+		let storedBase: string;
+		if (
+			typeof storedBaseResult === "object" &&
+			storedBaseResult !== null &&
+			"text" in storedBaseResult &&
+			typeof storedBaseResult.text === "function"
+		) {
+			storedBase = (await storedBaseResult.text()).trim();
+		} else {
+			const resolved = await storedBaseResult;
+			storedBase =
+				typeof resolved === "string"
+					? resolved.trim()
+					: String(resolved).trim();
+		}
+
+		// Verify the stored base branch still exists
+		if (storedBase && storedBase.length > 0) {
+			try {
+				await run`git show-ref --verify --quiet refs/heads/${storedBase}`;
+				return storedBase;
+			} catch {
+				// Stored base branch doesn't exist anymore, continue to detection
+			}
+		}
+	} catch {
+		// No stored base branch, continue to detection
+	}
+
+	// Fallback: Try to find the merge base with common branches
+	try {
 		const commonBranches = [configBaseBranch, "main", "master", "develop"];
 
 		for (const branch of commonBranches) {

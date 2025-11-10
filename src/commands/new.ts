@@ -55,12 +55,34 @@ export const newCommand: CommandDefinition = {
 				: generateRandomBranchName();
 
 		try {
+			// Get the current branch (this will be the base branch for the new worktree)
+			const run = exec ?? $;
+			const currentBranchResult = run`git rev-parse --abbrev-ref HEAD`;
+			let currentBranch: string;
+			if (
+				typeof currentBranchResult === "object" &&
+				currentBranchResult !== null &&
+				"text" in currentBranchResult &&
+				typeof currentBranchResult.text === "function"
+			) {
+				currentBranch = (await currentBranchResult.text()).trim();
+			} else {
+				const resolved = await currentBranchResult;
+				currentBranch =
+					typeof resolved === "string"
+						? resolved.trim()
+						: String(resolved).trim();
+			}
+
 			// Use -b flag to create a new branch in the worktree
 			// This creates the branch from current HEAD (base branch)
 			// git worktree add -b <branch-name> <path>
-			const run = exec ?? $;
 			const worktreePath = `../${trimmedBranch}`;
 			await run`git worktree add -b ${trimmedBranch} ${worktreePath}`;
+
+			// Store the base branch information in git config for this branch
+			// This allows finish command to know which branch to merge into
+			await run`git config branch.${trimmedBranch}.gitterflow-base-branch ${currentBranch}`;
 
 			// Resolve to absolute path
 			const absoluteWorktreePath = resolve(worktreePath);
@@ -80,7 +102,7 @@ export const newCommand: CommandDefinition = {
 					const ide = getSetting("ide");
 					const openTerminal = getSetting("open_terminal");
 
-					spawnTerminal(absoluteWorktreePath);
+					spawnTerminal(absoluteWorktreePath, agentCommand);
 
 					// Show appropriate messages based on what was opened
 					const messages: string[] = [];
@@ -91,7 +113,9 @@ export const newCommand: CommandDefinition = {
 						messages.push(`🚀 Opened new terminal in worktree directory`);
 					}
 					if (messages.length > 0) {
-						messages.forEach((msg) => stdout(msg));
+						for (const msg of messages) {
+							stdout(msg);
+						}
 						stdout(`🤖 Running coding agent: ${agentCommand}`);
 					}
 				} catch {
