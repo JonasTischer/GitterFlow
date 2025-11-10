@@ -1,102 +1,8 @@
-import { spawn } from "node:child_process";
-import { platform } from "node:os";
 import { resolve } from "node:path";
 import { $ } from "bun";
 import { getSetting } from "../config";
+import { spawnTerminal } from "../utils/terminal";
 import type { CommandDefinition } from "./types";
-
-const _codingAgent = getSetting("coding_agent");
-const _terminal = getSetting("terminal");
-/**
- * Spawn a new terminal window/tab in the specified directory and run the coding agent
- * Supports configurable terminal types and coding agent commands
- */
-function spawnTerminal(dir: string, agentCommand: string): void {
-	const os = platform();
-	const absolutePath = resolve(dir);
-	if (os === "darwin") {
-		if (_terminal === "iterm") {
-			// iTerm2 - create new tab, cd to directory, and run agent command
-			spawn("osascript", [
-				"-e",
-				'tell application "iTerm"',
-				"-e",
-				"tell current window",
-				"-e",
-				"create tab with default profile",
-				"-e",
-				"tell current session of current tab",
-				"-e",
-				`write text "cd '${absolutePath}' && ${agentCommand}"`,
-				"-e",
-				"end tell",
-				"-e",
-				"end tell",
-				"-e",
-				"end tell",
-			]);
-		} else {
-			// Terminal.app (default) - cd to directory and run agent command
-			const script = `tell application "Terminal"
-         do script "cd '${absolutePath}' && ${agentCommand}"
-         activate
-       end tell`;
-			spawn("osascript", ["-e", script]);
-		}
-	} else if (os === "linux") {
-		if (_terminal === "gnome-terminal") {
-			// GNOME Terminal - cd and run agent command
-			spawn(
-				"gnome-terminal",
-				[
-					"--working-directory",
-					absolutePath,
-					"--",
-					"bash",
-					"-c",
-					`cd '${absolutePath}' && ${agentCommand}; exec bash`,
-				],
-				{ detached: true },
-			);
-		} else {
-			// Fallback to gnome-terminal
-			spawn(
-				"gnome-terminal",
-				[
-					"--working-directory",
-					absolutePath,
-					"--",
-					"bash",
-					"-c",
-					`cd '${absolutePath}' && ${agentCommand}; exec bash`,
-				],
-				{ detached: true },
-			);
-		}
-	} else if (os === "win32") {
-		if (_terminal === "windows-terminal") {
-			// Windows Terminal - cd and run agent command
-			spawn(
-				"wt.exe",
-				[
-					"-w",
-					"0",
-					"powershell.exe",
-					"-NoExit",
-					`cd '${absolutePath}'; ${agentCommand}`,
-				],
-				{ detached: true },
-			);
-		} else {
-			// Fallback to cmd - cd and run agent command
-			spawn("cmd.exe", ["/k", `cd /d ${absolutePath} && ${agentCommand}`], {
-				detached: true,
-			});
-		}
-	} else {
-		throw new Error(`Unsupported OS: ${os}`);
-	}
-}
 
 /**
  * Generate a random branch name
@@ -170,13 +76,13 @@ export const newCommand: CommandDefinition = {
 
 			if (!skipTerminalSpawn) {
 				try {
-					const agentCommand = _codingAgent;
-					spawnTerminal(absoluteWorktreePath, agentCommand);
+					const agentCommand = getSetting("coding_agent");
+					spawnTerminal(absoluteWorktreePath);
 					stdout(`🚀 Opened new terminal in worktree directory`);
 					stdout(`🤖 Running coding agent: ${agentCommand}`);
 				} catch {
 					// If spawning fails, fall back to outputting commands
-					const agentCommand = _codingAgent;
+					const agentCommand = getSetting("coding_agent");
 					stdout(`cd ${absoluteWorktreePath}`);
 					stdout(`${agentCommand}`);
 					stderr(
@@ -185,7 +91,7 @@ export const newCommand: CommandDefinition = {
 				}
 			} else {
 				// In test/CI environment, just output the commands
-				const agentCommand = _codingAgent;
+				const agentCommand = getSetting("coding_agent");
 				stdout(`cd ${absoluteWorktreePath}`);
 				stdout(`${agentCommand}`);
 			}
