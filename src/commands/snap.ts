@@ -11,41 +11,82 @@ const _aiModel = getSetting("ai_model");
 
 /**
  * Prompt user for commit message confirmation with option to edit
+ * Supports single-key shortcuts: y (yes), e (edit), n (cancel)
  * Returns the commit message to use (original or edited)
  */
 async function promptCommitMessage(
 	generatedMessage: string,
 ): Promise<string | null> {
-	const action = await p.select({
-		message: "Commit with this message?",
-		options: [
-			{ value: "yes", label: "Yes (y) - Commit with this message" },
-			{ value: "edit", label: "Edit (e) - Modify the message" },
-			{ value: "cancel", label: "Cancel (n) - Don't commit" },
-		],
-		initialValue: "yes",
+	// Show the options
+	console.log("\n");
+	console.log("  Commit with this message?");
+	console.log("  • Yes (y) - Commit with this message");
+	console.log("  • Edit (e) - Modify the message");
+	console.log("  • Cancel (n) - Don't commit");
+	console.log("");
+
+	// Set stdin to raw mode to capture single key presses
+	const wasRaw = process.stdin.isRaw;
+	if (!wasRaw) {
+		process.stdin.setRawMode(true);
+	}
+	process.stdin.resume();
+	process.stdin.setEncoding("utf8");
+
+	return new Promise((resolve) => {
+		const onData = (key: string) => {
+			// Handle Ctrl+C
+			if (key === "\u0003") {
+				process.stdin.setRawMode(wasRaw);
+				process.stdin.pause();
+				process.stdin.removeListener("data", onData);
+				resolve(null);
+				return;
+			}
+
+			const lowerKey = key.toLowerCase().trim();
+
+			// Restore stdin
+			process.stdin.setRawMode(wasRaw);
+			process.stdin.pause();
+			process.stdin.removeListener("data", onData);
+
+			if (lowerKey === "y" || lowerKey === "\r" || lowerKey === "\n") {
+				// Yes - commit with generated message
+				console.log("  ✓ Yes\n");
+				resolve(generatedMessage);
+			} else if (lowerKey === "e") {
+				// Edit - prompt for edited message
+				console.log("  ✏ Edit\n");
+				// Use @clack/prompts for the edit input
+				(async () => {
+					const editedMessage = await p.text({
+						message: "Edit commit message:",
+						initialValue: generatedMessage,
+						placeholder: generatedMessage,
+					});
+					if (p.isCancel(editedMessage)) {
+						resolve(null);
+					} else {
+						resolve(editedMessage?.trim() || generatedMessage);
+					}
+				})();
+				return; // Don't resolve yet, wait for edit input
+			} else if (lowerKey === "n" || lowerKey === "\u001b") {
+				// Cancel or Escape
+				console.log("  ✗ Cancel\n");
+				resolve(null);
+			} else {
+				// Invalid key - restart the prompt
+				console.log(
+					`  Invalid key '${key}'. Press y (yes), e (edit), or n (cancel)\n`,
+				);
+				resolve(promptCommitMessage(generatedMessage));
+			}
+		};
+
+		process.stdin.once("data", onData);
 	});
-
-	if (p.isCancel(action) || action === "cancel") {
-		return null;
-	}
-
-	if (action === "yes") {
-		return generatedMessage;
-	}
-
-	// Edit mode
-	const editedMessage = await p.text({
-		message: "Edit commit message:",
-		initialValue: generatedMessage,
-		placeholder: generatedMessage,
-	});
-
-	if (p.isCancel(editedMessage)) {
-		return null;
-	}
-
-	return editedMessage?.trim() || generatedMessage;
 }
 
 /**
