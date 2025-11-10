@@ -265,8 +265,6 @@ describe("new command (integration)", () => {
 		const { repoPath, cleanup } = await createTestRepo();
 
 		try {
-			const parentDir = join(repoPath, "..");
-
 			// Run command without branch name
 			const result =
 				await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new`.quiet();
