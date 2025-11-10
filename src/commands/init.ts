@@ -17,6 +17,7 @@ interface Config {
 	ai_model: string;
 	open_terminal: boolean;
 	delete_remote_on_finish: boolean;
+	ide: string | null;
 }
 
 type ShellType = "zsh" | "bash" | "fish" | "unknown";
@@ -218,6 +219,50 @@ export const initCommand: CommandDefinition = {
 			return 0;
 		}
 
+		// Ask about IDE preference (right after terminal question)
+		const useIDE = await p.confirm({
+			message: "Open IDE after creating a worktree? (e.g., Cursor, VS Code)",
+			initialValue: false,
+		});
+
+		if (p.isCancel(useIDE)) {
+			p.cancel("Initialization cancelled.");
+			return 0;
+		}
+
+		let ideName: string | null = null;
+		if (useIDE) {
+			const ide = await p.select({
+				message: "Which IDE?",
+				options: [
+					{ value: "cursor", label: "Cursor" },
+					{ value: "code", label: "VS Code" },
+					{ value: "custom", label: "Custom (enter name)" },
+				],
+			});
+
+			if (p.isCancel(ide)) {
+				p.cancel("Initialization cancelled.");
+				return 0;
+			}
+
+			if (ide === "custom") {
+				const customIDE = await p.text({
+					message: "IDE name or command?",
+					placeholder: "cursor, code, etc.",
+				});
+
+				if (p.isCancel(customIDE)) {
+					p.cancel("Initialization cancelled.");
+					return 0;
+				}
+
+				ideName = customIDE?.trim() || null;
+			} else {
+				ideName = ide;
+			}
+		}
+
 		// Ask whether to delete remote branches after merging
 		const deleteRemoteOnFinish = await p.confirm({
 			message: "Delete remote branches after merging?",
@@ -236,6 +281,7 @@ export const initCommand: CommandDefinition = {
 			ai_model: aiModel || "qwen/qwen3-235b-a22b-2507",
 			open_terminal: openTerminal ?? true,
 			delete_remote_on_finish: deleteRemoteOnFinish ?? false,
+			ide: ideName,
 		};
 
 		// Write config to file
@@ -254,7 +300,8 @@ export const initCommand: CommandDefinition = {
 			stdout(`   Base branch: ${config.base_branch}`);
 			stdout(`   Worktrees directory: ${config.worktrees_dir}`);
 			stdout(`   AI model: ${config.ai_model}`);
-			stdout(`   Auto-open terminal: ${config.open_terminal}`);
+			stdout(`   Auto-open terminal: ${config.open_terminal ? "Yes" : "No"}`);
+			stdout(`   IDE: ${config.ide || "None"}`);
 			stdout(`   Delete remote on finish: ${config.delete_remote_on_finish}`);
 			stdout(`\n📁 Config file: ${configPath}`);
 

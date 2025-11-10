@@ -77,9 +77,23 @@ export const newCommand: CommandDefinition = {
 			if (!skipTerminalSpawn) {
 				try {
 					const agentCommand = getSetting("coding_agent");
+					const ide = getSetting("ide");
+					const openTerminal = getSetting("open_terminal");
+
 					spawnTerminal(absoluteWorktreePath);
-					stdout(`🚀 Opened new terminal in worktree directory`);
-					stdout(`🤖 Running coding agent: ${agentCommand}`);
+
+					// Show appropriate messages based on what was opened
+					const messages: string[] = [];
+					if (ide) {
+						messages.push(`🚀 Opened ${ide} in worktree directory`);
+					}
+					if (openTerminal) {
+						messages.push(`🚀 Opened new terminal in worktree directory`);
+					}
+					if (messages.length > 0) {
+						messages.forEach((msg) => stdout(msg));
+						stdout(`🤖 Running coding agent: ${agentCommand}`);
+					}
 				} catch {
 					// If spawning fails, fall back to outputting commands
 					const agentCommand = getSetting("coding_agent");

@@ -114,13 +114,27 @@ export const listCommand: CommandDefinition = {
 				return 0;
 			}
 
-			// Open terminal in selected worktree
+			// Open terminal/IDE in selected worktree
 			try {
 				const absolutePath = resolve(selectedPath);
 				const agentCommand = getSetting("coding_agent");
+				const ide = getSetting("ide");
+				const openTerminal = getSetting("open_terminal");
+
 				spawnTerminal(absolutePath);
-				stdout(`🚀 Opened terminal in worktree: ${selectedPath}`);
-				stdout(`🤖 Running coding agent: ${agentCommand}`);
+
+				// Show appropriate messages based on what was opened
+				const messages: string[] = [];
+				if (ide) {
+					messages.push(`🚀 Opened ${ide} in worktree: ${selectedPath}`);
+				}
+				if (openTerminal) {
+					messages.push(`🚀 Opened terminal in worktree: ${selectedPath}`);
+				}
+				if (messages.length > 0) {
+					messages.forEach((msg) => stdout(msg));
+					stdout(`🤖 Running coding agent: ${agentCommand}`);
+				}
 			} catch (error) {
 				stderr(
 					`❌ Failed to open terminal: ${error instanceof Error ? error.message : String(error)}`,

@@ -2,12 +2,32 @@ import { spawn } from "node:child_process";
 import { platform } from "node:os";
 import { resolve } from "node:path";
 import { getSetting } from "../config";
+import { openIDE } from "./ide";
 
 /**
  * Spawn a new terminal window/tab in the specified directory and run the coding agent
  * Supports configurable terminal types and coding agent commands
+ * Can open both IDE and terminal if both are configured
  */
 export function spawnTerminal(dir: string, agentCommand?: string): void {
+	const ide = getSetting("ide");
+	const openTerminal = getSetting("open_terminal");
+
+	// Open IDE if configured
+	if (ide) {
+		try {
+			openIDE(dir, agentCommand);
+		} catch (error) {
+			// If IDE opening fails, log warning but continue
+			console.warn(`Failed to open IDE: ${error}.`);
+		}
+	}
+
+	// Open terminal if configured (can be opened alongside IDE)
+	if (!openTerminal) {
+		return;
+	}
+
 	const os = platform();
 	const absolutePath = resolve(dir);
 	const terminal = getSetting("terminal");

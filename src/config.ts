@@ -10,6 +10,7 @@ export interface GitterflowConfig {
 	delete_remote_on_finish: boolean;
 	coding_agent: string;
 	terminal: string;
+	ide: string | null;
 }
 
 let cachedConfig: GitterflowConfig | null = null;
@@ -28,6 +29,7 @@ export function loadConfig(): GitterflowConfig {
 			delete_remote_on_finish: false,
 			coding_agent: "claude",
 			terminal: "iterm",
+			ide: null,
 		};
 		return cachedConfig;
 	}
@@ -44,6 +46,7 @@ export function loadConfig(): GitterflowConfig {
 		delete_remote_on_finish: parsed.delete_remote_on_finish ?? false,
 		coding_agent: parsed.coding_agent ?? "claude",
 		terminal: parsed.terminal ?? "iterm",
+		ide: parsed.ide ?? null,
 	};
 
 	return cachedConfig;
