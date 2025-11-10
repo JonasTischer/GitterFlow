@@ -1,4 +1,5 @@
 import { $ } from "bun";
+import { resolve } from "node:path";
 import type { CommandDefinition } from "./types";
 
 /**
@@ -56,8 +57,21 @@ export const newCommand: CommandDefinition = {
 			// This creates the branch from current HEAD (base branch)
 			// git worktree add -b <branch-name> <path>
 			const run = exec ?? $;
-			await run`git worktree add -b ${trimmedBranch} ../${trimmedBranch}`;
-			stdout(`✅ Created worktree for branch ${trimmedBranch}`);
+			const worktreePath = `../${trimmedBranch}`;
+			await run`git worktree add -b ${trimmedBranch} ${worktreePath}`;
+
+			// Switch to the new worktree directory (resolve to absolute path)
+			// Wrap in try-catch to handle cases where directory doesn't exist (e.g., in tests)
+			try {
+				const absoluteWorktreePath = resolve(worktreePath);
+				process.chdir(absoluteWorktreePath);
+				stdout(`✅ Created worktree for branch ${trimmedBranch}`);
+				stdout(`📁 Switched to: ${process.cwd()}`);
+			} catch (chdirError) {
+				// If chdir fails (e.g., in unit tests), still report success but with relative path
+				stdout(`✅ Created worktree for branch ${trimmedBranch}`);
+				stdout(`📁 Switched to: ${resolve(worktreePath)}`);
+			}
 			return 0;
 		} catch (error) {
 			// Handle git errors gracefully

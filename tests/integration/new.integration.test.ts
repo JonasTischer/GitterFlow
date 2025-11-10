@@ -56,6 +56,11 @@ describe("new command (integration)", () => {
 			// Verify command succeeded
 			expect(result.exitCode).toBe(0);
 
+			// Verify output includes switch message
+			const output = result.stdout.toString();
+			expect(output).toContain("Created worktree");
+			expect(output).toContain("Switched to");
+
 			// Verify worktree directory was created
 			const exists = await pathExists(worktreePath);
 			expect(exists).toBe(true);
@@ -93,11 +98,15 @@ describe("new command (integration)", () => {
 			const parentDir = join(repoPath, "..");
 			const worktreePath = join(parentDir, "feature", "authentication");
 
-			await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature/authentication`.quiet();
+			const result = await $`cd ${repoPath} && bun ${join(process.cwd(), "src/index.ts")} new feature/authentication`.quiet();
 
 			// Verify worktree created (note: git creates nested directories)
 			const exists = await pathExists(worktreePath);
 			expect(exists).toBe(true);
+
+			// Verify output includes switch message
+			const output = result.stdout.toString();
+			expect(output).toContain("Switched to");
 
 			// Verify branch name is correct (with slash)
 			const branch = await getCurrentBranch(worktreePath);
@@ -261,6 +270,10 @@ describe("new command (integration)", () => {
 
 			// Command should succeed
 			expect(result.exitCode).toBe(0);
+
+			// Verify output includes switch message
+			const output = result.stdout.toString();
+			expect(output).toContain("Switched to");
 
 			// Should have created a worktree (verify we have more than just main repo)
 			const worktrees = await listWorktrees(repoPath);
