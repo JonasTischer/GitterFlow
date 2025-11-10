@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline";
 import { $ } from "bun";
-import type { CommandDefinition } from "./types";
 import { getSetting } from "../config";
+import type { CommandDefinition } from "./types";
 
 /**
  * Get the configured OpenRouter model from environment variable or config file

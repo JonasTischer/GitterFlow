@@ -1,12 +1,12 @@
 import {
+	appendFileSync,
 	existsSync,
+	mkdirSync,
 	readFileSync,
 	writeFileSync,
-	appendFileSync,
-	mkdirSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { resolve, join } from "node:path";
+import { join, resolve } from "node:path";
 import * as p from "@clack/prompts";
 import { stringify } from "yaml";
 import type { CommandDefinition } from "./types";
