@@ -1,5 +1,5 @@
-import { createInterface } from "node:readline";
 import { $ } from "bun";
+import * as p from "@clack/prompts";
 import { getSetting } from "../config";
 import type { CommandDefinition } from "./types";
 
@@ -10,26 +10,42 @@ import type { CommandDefinition } from "./types";
 const _aiModel = getSetting("ai_model");
 
 /**
- * Prompt user for confirmation
+ * Prompt user for commit message confirmation with option to edit
+ * Returns the commit message to use (original or edited)
  */
-async function promptConfirmation(
-	message: string,
-	_stdout: (msg: string) => void,
-): Promise<boolean> {
-	const rl = createInterface({
-		input: process.stdin,
-		output: process.stdout,
+async function promptCommitMessage(
+	generatedMessage: string,
+): Promise<string | null> {
+	const action = await p.select({
+		message: "Commit with this message?",
+		options: [
+			{ value: "yes", label: "Yes (y) - Commit with this message" },
+			{ value: "edit", label: "Edit (e) - Modify the message" },
+			{ value: "cancel", label: "Cancel (n) - Don't commit" },
+		],
+		initialValue: "yes",
 	});
 
-	return new Promise((resolve) => {
-		rl.question(message, (answer) => {
-			rl.close();
-			const confirmed =
-				answer.toLowerCase().trim() === "y" ||
-				answer.toLowerCase().trim() === "yes";
-			resolve(confirmed);
-		});
+	if (p.isCancel(action) || action === "cancel") {
+		return null;
+	}
+
+	if (action === "yes") {
+		return generatedMessage;
+	}
+
+	// Edit mode
+	const editedMessage = await p.text({
+		message: "Edit commit message:",
+		initialValue: generatedMessage,
+		placeholder: generatedMessage,
 	});
+
+	if (p.isCancel(editedMessage)) {
+		return null;
+	}
+
+	return editedMessage?.trim() || generatedMessage;
 }
 
 /**
@@ -144,26 +160,23 @@ export const snapCommand: CommandDefinition = {
 
 			// Generate commit message using AI
 			stdout("🤖 Generating commit message...");
-			const commitMessage = await generateCommitMessage(diff);
+			const generatedMessage = await generateCommitMessage(diff);
 
 			// Print the generated message
-			stdout(`\n📝 Generated commit message:\n   ${commitMessage}\n`);
+			stdout(`\n📝 Generated commit message:\n   ${generatedMessage}\n`);
 
 			// Ask for confirmation unless --no-confirm flag is set
-			let confirmed = noConfirm;
+			let commitMessage: string | null = generatedMessage;
 			if (!noConfirm) {
-				confirmed = await promptConfirmation(
-					"Commit with this message? [y/N] ",
-					stdout,
-				);
+				commitMessage = await promptCommitMessage(generatedMessage);
 			}
 
-			if (!confirmed) {
-				stdout("Commit cancelled.");
+			if (!commitMessage) {
+				p.cancel("Commit cancelled.");
 				return 0;
 			}
 
-			// Commit with the generated message
+			// Commit with the message (original or edited)
 			await run`git commit -m ${commitMessage} --no-verify`;
 			stdout(`✅ Commit created: ${commitMessage}`);
 
