@@ -41,3 +41,8 @@ terminal: iterm
 # Default: "claude"
 # Examples: "claude", "codex", "cursor", or any custom command
 codingAgent: claude
+
+# Optional: OpenRouter model for AI commit message generation (snap command)
+# Default: "qwen/qwen3-235b-a22b-2507"
+# Examples: "qwen/qwen3-235b-a22b-2507", "qwen/qwen3-235b-a22b-2507", or any OpenRouter model
+openRouterModel: qwen/qwen3-235b-a22b-2507

@@ -31,6 +31,9 @@ gitterflow list
 
 # Delete a worktree
 gitterflow delete [branch-name]
+
+# Automatically commit changes with AI-generated commit message
+gitterflow snap [--no-confirm]
 ```
 
 **Note:** The `new` command automatically opens a new terminal window/tab in the created worktree directory.
@@ -78,6 +81,24 @@ The command automatically runs a coding agent in the new terminal. Configure it 
 The terminal will automatically navigate to the worktree directory and run your configured coding agent command.
 
 If terminal spawning fails or is unavailable, the command outputs the `cd` and agent commands you can run manually.
+
+**Configuring OpenRouter Model (for `snap` command):**
+
+The `snap` command uses OpenRouter API to generate commit messages. Configure the model via:
+
+1. **Environment variable**:
+   ```bash
+   export GITTERFLOW_MODEL=qwen/qwen3-235b-a22b-2507  # or GF_MODEL, GITTERFLOW_OPENROUTER_MODEL, GF_OPENROUTER_MODEL
+   ```
+
+2. **Config file** (`.gitterflow.yaml`):
+   ```yaml
+   openRouterModel: qwen/qwen3-235b-a22b-2507  # or "anthropic/claude-3.5-sonnet" or any OpenRouter model
+   ```
+
+3. **Default**: `anthropic/claude-3.5-sonnet` (if not configured)
+
+**Note:** You need to set `OPENROUTER_API_KEY` environment variable to use the `snap` command.
 
 ## Development
 

@@ -2,6 +2,7 @@ import { deleteCommand } from "./delete";
 import { helpCommand } from "./help";
 import { listCommand } from "./list";
 import { newCommand } from "./new";
+import { snapCommand } from "./snap";
 import type { CommandDefinition } from "./types";
 
 export const commandMap: Record<string, CommandDefinition> = {
@@ -9,6 +10,7 @@ export const commandMap: Record<string, CommandDefinition> = {
 	new: newCommand,
 	list: listCommand,
 	delete: deleteCommand,
+	snap: snapCommand,
 };
 
 for (const definition of Object.values(commandMap)) {
@@ -22,5 +24,6 @@ export const orderedCommands: CommandDefinition[] = [
 	newCommand,
 	listCommand,
 	deleteCommand,
+	snapCommand,
 	helpCommand,
 ];
