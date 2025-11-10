@@ -25,5 +25,9 @@
 		"lint": "biome lint src tests",
 		"lint:fix": "biome lint src tests --write"
 	},
-	"type": "module"
+	"type": "module",
+	"dependencies": {
+		"@clack/prompts": "^0.11.0",
+		"yaml": "^2.8.1"
+	}
 }

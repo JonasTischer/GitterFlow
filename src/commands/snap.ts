@@ -1,48 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { $ } from "bun";
 import type { CommandDefinition } from "./types";
+import { getSetting } from "../config";
 
 /**
  * Get the configured OpenRouter model from environment variable or config file
  * Defaults to "qwen/qwen3-235b-a22b-2507" if not configured
  */
-function getOpenRouterModel(): string {
-	// Check environment variable first
-	const envModel =
-		process.env.GITTERFLOW_MODEL ||
-		process.env.GF_MODEL ||
-		process.env.GITTERFLOW_OPENROUTER_MODEL ||
-		process.env.GF_OPENROUTER_MODEL;
-	if (envModel) {
-		return envModel;
-	}
-
-	// Try to load from config file
-	try {
-		const configPath = resolve(".gitterflow.yaml");
-		if (existsSync(configPath)) {
-			const configContent = readFileSync(configPath, "utf-8");
-			// Simple YAML parsing for openRouterModel or model field
-			const openRouterModelMatch = configContent.match(
-				/^openRouterModel:\s*(.+)$/m,
-			);
-			const modelMatch = configContent.match(/^model:\s*(.+)$/m);
-			if (openRouterModelMatch?.[1]) {
-				return openRouterModelMatch[1].trim();
-			}
-			if (modelMatch?.[1]) {
-				return modelMatch[1].trim();
-			}
-		}
-	} catch {
-		// Ignore config file errors
-	}
-
-	// Default to "qwen/qwen3-235b-a22b-2507"
-	return "qwen/qwen3-235b-a22b-2507";
-}
+const _aiModel = getSetting("ai_model");
 
 /**
  * Prompt user for confirmation
@@ -85,10 +50,7 @@ Use the conventional commits style (e.g. 'feat:', 'fix:', 'refactor:').
 Diff:
 ${diff}`;
 
-	const model = getOpenRouterModel();
-
-	// Debug: log the model being used
-	console.log("🔍 [DEBUG] Using OpenRouter model:", model);
+	const model = _aiModel;
 
 	const requestBody: {
 		model: string;
@@ -106,13 +68,6 @@ ${diff}`;
 			sort: "throughput",
 		},
 	};
-
-	// Debug: log the prompt being sent
-	console.log("🔍 [DEBUG] Sending prompt to OpenRouter API:");
-	console.log("─".repeat(60));
-	console.log(prompt);
-	console.log("─".repeat(60));
-	console.log("🔍 [DEBUG] Request body:", JSON.stringify(requestBody, null, 2));
 
 	const response = await fetch(
 		"https://openrouter.ai/api/v1/chat/completions",
@@ -137,13 +92,8 @@ ${diff}`;
 		choices?: Array<{ message?: { content?: string } }>;
 	};
 
-	// Debug: log the response
-	console.log("🔍 [DEBUG] API Response:", JSON.stringify(data, null, 2));
-
 	const message =
 		data.choices?.[0]?.message?.content?.trim() || "chore: update code";
-
-	console.log("🔍 [DEBUG] Generated commit message:", message);
 
 	return message;
 }
