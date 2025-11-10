@@ -21,21 +21,63 @@ bun link
 ```bash
 # Show help
 gitterflow help
-# or
-gf help
 
-# Create a new worktree with dev environment
-gf create feature-branch
-
-# Ship changes back to main branch
-gf ship -m "Add new feature"
+# Create a new worktree (with optional branch name)
+# Automatically opens a new terminal window/tab in the worktree directory
+gitterflow new [branch-name]
 
 # List active worktrees
-gf list
+gitterflow list
 
-# Clean up a worktree
-gf cleanup feature-branch
+# Delete a worktree
+gitterflow delete [branch-name]
 ```
+
+**Note:** The `new` command automatically opens a new terminal window/tab in the created worktree directory.
+
+**Configuring Terminal:**
+
+You can configure which terminal to use in three ways:
+
+1. **Environment variable** (highest priority):
+   ```bash
+   export GITTERFLOW_TERMINAL=iterm  # or GF_TERMINAL=iterm
+   ```
+
+2. **Config file** (`.gitterflow.yaml`):
+   ```yaml
+   terminal: iterm  # Options: terminal, iterm (macOS) | gnome-terminal (Linux) | windows-terminal (Windows)
+   ```
+
+3. **Auto-detection** (fallback):
+   - macOS: Detects iTerm2 if `TERM_PROGRAM=iTerm.app`, otherwise uses Terminal.app
+   - Linux: Uses GNOME Terminal
+   - Windows: Uses Windows Terminal
+
+**Supported terminals:**
+- **macOS**: `terminal` (Terminal.app), `iterm` (iTerm2)
+- **Linux**: `gnome-terminal`
+- **Windows**: `windows-terminal` (Windows Terminal), `cmd` (Command Prompt)
+
+**Configuring Coding Agent:**
+
+The command automatically runs a coding agent in the new terminal. Configure it via:
+
+1. **Environment variable**:
+   ```bash
+   export GITTERFLOW_AGENT=codex  # or GF_AGENT, GITTERFLOW_CODING_AGENT, GF_CODING_AGENT
+   ```
+
+2. **Config file** (`.gitterflow.yaml`):
+   ```yaml
+   codingAgent: codex  # or "claude", "cursor", or any custom command
+   ```
+
+3. **Default**: `claude` (if not configured)
+
+The terminal will automatically navigate to the worktree directory and run your configured coding agent command.
+
+If terminal spawning fails or is unavailable, the command outputs the `cd` and agent commands you can run manually.
 
 ## Development
 

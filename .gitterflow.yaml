@@ -36,8 +36,3 @@ tmuxLayout: main-horizontal
 # Windows: "windows-terminal" (Windows Terminal) or "cmd" (Command Prompt)
 # Auto-detected on macOS based on TERM_PROGRAM if not set
 terminal: iterm
-
-# Optional: Coding agent command to run in the new terminal
-# Default: "claude"
-# Examples: "claude", "codex", "cursor", or any custom command
-codingAgent: claude

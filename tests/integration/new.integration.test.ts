@@ -56,10 +56,11 @@ describe("new command (integration)", () => {
 			// Verify command succeeded
 			expect(result.exitCode).toBe(0);
 
-			// Verify output includes switch message
+			// Verify output includes switch message and cd command
 			const output = result.stdout.toString();
 			expect(output).toContain("Created worktree");
 			expect(output).toContain("Switched to");
+			expect(output).toContain("cd ");
 
 			// Verify worktree directory was created
 			const exists = await pathExists(worktreePath);
@@ -105,9 +106,10 @@ describe("new command (integration)", () => {
 			const exists = await pathExists(worktreePath);
 			expect(exists).toBe(true);
 
-			// Verify output includes switch message
+			// Verify output includes switch message and cd command
 			const output = result.stdout.toString();
 			expect(output).toContain("Switched to");
+			expect(output).toContain("cd ");
 
 			// Verify branch name is correct (with slash)
 			const branch = await getCurrentBranch(worktreePath);
@@ -272,9 +274,10 @@ describe("new command (integration)", () => {
 			// Command should succeed
 			expect(result.exitCode).toBe(0);
 
-			// Verify output includes switch message
+			// Verify output includes switch message and cd command
 			const output = result.stdout.toString();
 			expect(output).toContain("Switched to");
+			expect(output).toContain("cd ");
 
 			// Should have created a worktree (verify we have more than just main repo)
 			const worktrees = await listWorktrees(repoPath);

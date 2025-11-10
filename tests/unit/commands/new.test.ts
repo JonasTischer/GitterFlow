@@ -15,9 +15,11 @@ describe("new command", () => {
 			});
 
 			expect(exitCode).toBe(0);
-			expect(stdoutMessages).toHaveLength(2);
+			expect(stdoutMessages).toHaveLength(4);
 			expect(stdoutMessages[0]).toContain("Created worktree");
 			expect(stdoutMessages[1]).toContain("Switched to");
+			expect(stdoutMessages[2]).toContain("cd ");
+			expect(stdoutMessages[3]).toContain("claude");
 
 			// Should have created a worktree with some generated name
 			expect(calls).toHaveLength(1);
@@ -36,7 +38,7 @@ describe("new command", () => {
 			});
 
 			expect(exitCode).toBe(0);
-			expect(stdoutMessages).toHaveLength(2);
+			expect(stdoutMessages).toHaveLength(4);
 			// Should have generated a random name
 			expect(calls).toHaveLength(1);
 		});
@@ -52,7 +54,7 @@ describe("new command", () => {
 			});
 
 			expect(exitCode).toBe(0);
-			expect(stdoutMessages).toHaveLength(2);
+			expect(stdoutMessages).toHaveLength(4);
 			// Should have generated a random name
 			expect(calls).toHaveLength(1);
 		});
@@ -93,11 +95,13 @@ describe("new command", () => {
 
 			expect(exitCode).toBe(0);
 			expect(stderrMessages).toHaveLength(0);
-			expect(stdoutMessages).toHaveLength(2);
+			expect(stdoutMessages).toHaveLength(4);
 			expect(stdoutMessages[0]).toContain(
 				"Created worktree for branch feature/new-feature",
 			);
 			expect(stdoutMessages[1]).toContain("Switched to");
+			expect(stdoutMessages[2]).toContain("cd ");
+			expect(stdoutMessages[3]).toContain("claude");
 
 			// Should use -b flag to create new branch
 			expect(calls).toHaveLength(1);
@@ -139,6 +143,8 @@ describe("new command", () => {
 
 			expect(stdoutMessages[0]).toContain("feature/authentication");
 			expect(stdoutMessages[1]).toContain("Switched to");
+			expect(stdoutMessages[2]).toContain("cd ");
+			expect(stdoutMessages[3]).toContain("claude");
 			expect(calls[0]?.values).toContain("feature/authentication");
 		});
 
@@ -248,6 +254,8 @@ describe("new command", () => {
 			expect(stdoutMessages[0]).toContain("my-branch");
 			expect(stdoutMessages[0]).not.toContain("extra");
 			expect(stdoutMessages[1]).toContain("Switched to");
+			expect(stdoutMessages[2]).toContain("cd ");
+			expect(stdoutMessages[3]).toContain("claude");
 			expect(calls[0]?.values).toContain("my-branch");
 		});
 	});
@@ -263,10 +271,12 @@ describe("new command", () => {
 				...io,
 			});
 
-			expect(stdoutMessages).toHaveLength(2);
+			expect(stdoutMessages).toHaveLength(4);
 			expect(stdoutMessages[0]).toContain("Created worktree");
 			expect(stdoutMessages[0]).toContain("feature/awesome");
 			expect(stdoutMessages[1]).toContain("Switched to");
+			expect(stdoutMessages[2]).toContain("cd ");
+			expect(stdoutMessages[3]).toContain("claude");
 		});
 
 		test("should use checkmark emoji in success message", async () => {
@@ -281,6 +291,7 @@ describe("new command", () => {
 
 			expect(stdoutMessages[0]).toContain("✅");
 			expect(stdoutMessages[1]).toContain("📁");
+			expect(stdoutMessages[2]).toContain("cd ");
 		});
 	});
 });
