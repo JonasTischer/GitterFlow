@@ -278,6 +278,18 @@ export const finishCommand: CommandDefinition = {
 			);
 			stdout(`   Base branch: ${baseBranch}`);
 
+			// Step 2.5: Check if we're already on the base branch
+			if (currentBranch === baseBranch) {
+				stderr(
+					`\n⚠️  You are already on the base branch (${baseBranch}).`,
+				);
+				stderr(
+					`   The 'finish' command is meant to merge feature branches into the base branch.`,
+				);
+				stderr(`   If you want to push changes on ${baseBranch}, use: git push`);
+				return 1;
+			}
+
 			// Step 3: Commit any uncommitted changes
 			stdout("\n📝 Checking for uncommitted changes...");
 			await commitUncommittedChanges(run, stdout);
