@@ -154,9 +154,7 @@ async function getCurrentBranch(run: typeof $): Promise<string> {
 	} else {
 		const resolved = await result;
 		branch =
-			typeof resolved === "string"
-				? resolved.trim()
-				: String(resolved).trim();
+			typeof resolved === "string" ? resolved.trim() : String(resolved).trim();
 	}
 	return branch;
 }
@@ -280,13 +278,13 @@ export const finishCommand: CommandDefinition = {
 
 			// Step 2.5: Check if we're already on the base branch
 			if (currentBranch === baseBranch) {
-				stderr(
-					`\n⚠️  You are already on the base branch (${baseBranch}).`,
-				);
+				stderr(`\n⚠️  You are already on the base branch (${baseBranch}).`);
 				stderr(
 					`   The 'finish' command is meant to merge feature branches into the base branch.`,
 				);
-				stderr(`   If you want to push changes on ${baseBranch}, use: git push`);
+				stderr(
+					`   If you want to push changes on ${baseBranch}, use: git push`,
+				);
 				return 1;
 			}
 
@@ -324,8 +322,12 @@ export const finishCommand: CommandDefinition = {
 						`   checkout ${baseBranch} in the main repo and run the merge manually.`,
 					);
 					stderr(`\n   Alternatively, you can:`);
-					stderr(`   1. Push your current branch: git push origin ${currentBranch}`);
-					stderr(`   2. Go to main repo and merge: git checkout ${baseBranch} && git merge ${currentBranch}`);
+					stderr(
+						`   1. Push your current branch: git push origin ${currentBranch}`,
+					);
+					stderr(
+						`   2. Go to main repo and merge: git checkout ${baseBranch} && git merge ${currentBranch}`,
+					);
 					stderr(`   3. Push: git push origin ${baseBranch}`);
 					return 1;
 				} else {
@@ -341,7 +343,9 @@ export const finishCommand: CommandDefinition = {
 				} catch (error) {
 					// If pull fails, it might be because the branch doesn't exist remotely yet
 					// That's okay, we'll continue
-					stdout(`   Note: Could not pull ${baseBranch} (may not exist remotely yet)`);
+					stdout(
+						`   Note: Could not pull ${baseBranch} (may not exist remotely yet)`,
+					);
 				}
 			}
 
@@ -432,7 +436,9 @@ export const finishCommand: CommandDefinition = {
 					} catch {
 						// Worktree might already be removed or path differs
 						if (!worktreeRemoved) {
-							stdout(`   Note: Could not remove worktree (may have already been removed or path differs)`);
+							stdout(
+								`   Note: Could not remove worktree (may have already been removed or path differs)`,
+							);
 						}
 					}
 				}
@@ -452,4 +458,3 @@ export const finishCommand: CommandDefinition = {
 		}
 	},
 };
-
