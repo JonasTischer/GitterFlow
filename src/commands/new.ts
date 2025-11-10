@@ -1,7 +1,7 @@
-import { resolve } from "node:path";
 import { spawn } from "node:child_process";
-import { platform } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
+import { platform } from "node:os";
+import { resolve } from "node:path";
 import { $ } from "bun";
 import type { CommandDefinition } from "./types";
 
