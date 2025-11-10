@@ -549,12 +549,28 @@ export const finishCommand: CommandDefinition = {
 				stdout(`📥 Pulling latest changes for ${baseBranch}...`);
 				try {
 					await mergeRun`git pull origin ${baseBranch}`;
-				} catch {
-					// If pull fails, it might be because the branch doesn't exist remotely yet
-					// That's okay, we'll continue
-					stdout(
-						`   Note: Could not pull ${baseBranch} (may not exist remotely yet)`,
-					);
+				} catch (pullError) {
+					const pullErrorMessage =
+						pullError instanceof Error ? pullError.message : String(pullError);
+					// Check if pull failed due to uncommitted changes
+					if (
+						pullErrorMessage.includes("uncommitted changes") ||
+						pullErrorMessage.includes("nicht zum Commit vorgemerkt") ||
+						pullErrorMessage.includes("Änderungen")
+					) {
+						stdout(
+							`   Note: Could not pull ${baseBranch} due to uncommitted changes.`,
+						);
+						stdout(
+							`   Merge will proceed, but you may want to commit or stash changes in ${baseBranch}.`,
+						);
+					} else {
+						// If pull fails for other reasons, it might be because the branch doesn't exist remotely yet
+						// That's okay, we'll continue
+						stdout(
+							`   Note: Could not pull ${baseBranch} (may not exist remotely yet)`,
+						);
+					}
 				}
 			}
 
@@ -600,43 +616,21 @@ export const finishCommand: CommandDefinition = {
 			stdout(`\n🧹 Cleanup options:`);
 			stdout(`   Delete remote branch: ${deleteRemoteOnFinish ? "Yes" : "No"}`);
 
-			// Check if remote branch exists
-			const remoteBranchExists = await branchExists(run, currentBranch, true);
-			if (remoteBranchExists && deleteRemoteOnFinish) {
-				stdout(`   Deleting remote branch: origin/${currentBranch}`);
-				try {
-					await run`git push origin --delete ${currentBranch}`;
-					stdout(`✅ Deleted remote branch: origin/${currentBranch}`);
-				} catch (error) {
-					stderr(
-						`⚠️  Failed to delete remote branch: ${error instanceof Error ? error.message : String(error)}`,
-					);
-				}
-			}
-
-			// Check if local branch exists (it should, but check anyway)
-			const localBranchExists = await branchExists(run, currentBranch, false);
-			if (localBranchExists) {
-				stdout(`   Deleting local branch: ${currentBranch}`);
-				await run`git branch -d ${currentBranch}`;
-				stdout(`✅ Deleted local branch: ${currentBranch}`);
-			}
-
-			// Remove the worktree (we stored the path before checkout)
-			// Try multiple approaches to find and remove the worktree
+			// IMPORTANT: Remove worktree FIRST before deleting branches
+			// The branch cannot be deleted while it's checked out in a worktree
 			stdout(`   Removing worktree for branch: ${currentBranch}`);
 			let worktreeRemoved = false;
 
-			// Try 1: Remove by relative path (common pattern: ../branch-name)
+			// Try 1: Remove by stored worktree path (most reliable)
 			try {
-				await run`git worktree remove ../${currentBranch}`;
-				stdout(`✅ Removed worktree: ../${currentBranch}`);
+				await run`git worktree remove ${currentWorktreePath}`;
+				stdout(`✅ Removed worktree: ${currentWorktreePath}`);
 				worktreeRemoved = true;
 			} catch {
-				// Try 2: Remove by stored worktree path
+				// Try 2: Remove by relative path (common pattern: ../branch-name)
 				try {
-					await run`git worktree remove ${currentWorktreePath}`;
-					stdout(`✅ Removed worktree: ${currentWorktreePath}`);
+					await run`git worktree remove ../${currentBranch}`;
+					stdout(`✅ Removed worktree: ../${currentBranch}`);
 					worktreeRemoved = true;
 				} catch {
 					// Try 3: Remove using worktrees_dir config
@@ -655,6 +649,42 @@ export const finishCommand: CommandDefinition = {
 						}
 					}
 				}
+			}
+
+			// Now that worktree is removed, we can delete the branches
+			// Check if remote branch exists
+			const remoteBranchExists = await branchExists(run, currentBranch, true);
+			if (remoteBranchExists && deleteRemoteOnFinish) {
+				stdout(`   Deleting remote branch: origin/${currentBranch}`);
+				try {
+					await run`git push origin --delete ${currentBranch}`;
+					stdout(`✅ Deleted remote branch: origin/${currentBranch}`);
+				} catch (error) {
+					stderr(
+						`⚠️  Failed to delete remote branch: ${error instanceof Error ? error.message : String(error)}`,
+					);
+				}
+			}
+
+			// Check if local branch exists (it should, but check anyway)
+			// Only try to delete if worktree was successfully removed
+			if (worktreeRemoved) {
+				const localBranchExists = await branchExists(run, currentBranch, false);
+				if (localBranchExists) {
+					stdout(`   Deleting local branch: ${currentBranch}`);
+					try {
+						await run`git branch -d ${currentBranch}`;
+						stdout(`✅ Deleted local branch: ${currentBranch}`);
+					} catch (error) {
+						stderr(
+							`⚠️  Failed to delete local branch: ${error instanceof Error ? error.message : String(error)}`,
+						);
+					}
+				}
+			} else {
+				stdout(
+					`   Skipping local branch deletion (worktree removal failed or branch still checked out)`,
+				);
 			}
 
 			// Success summary
