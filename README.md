@@ -1,4 +1,4 @@
-THIS IS A TEST
+THIS IS A TEST2
 # GitterFlow CLI
 
 > A fast, ergonomic CLI for managing parallel AI coding workflows with Git worktrees
