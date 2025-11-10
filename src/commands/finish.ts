@@ -290,6 +290,134 @@ async function branchExists(
 	}
 }
 
+/**
+ * Get the main repository directory (where .git is located)
+ * Works from both main repo and worktrees
+ */
+async function getMainRepoDir(
+	run: CommandExecutor | typeof $,
+): Promise<string> {
+	try {
+		// First, try to get the common git directory
+		// From a worktree, this will be something like /path/to/main/repo/.git/worktrees/worktree-name
+		// From the main repo, this will be /path/to/main/repo/.git
+		const commonDirResult = run`git rev-parse --git-common-dir`;
+		let commonDir: string;
+		if (
+			typeof commonDirResult === "object" &&
+			commonDirResult !== null &&
+			"text" in commonDirResult &&
+			typeof commonDirResult.text === "function"
+		) {
+			commonDir = (await commonDirResult.text()).trim();
+		} else {
+			const resolved = await commonDirResult;
+			commonDir =
+				typeof resolved === "string"
+					? resolved.trim()
+					: resolved !== null && resolved !== undefined
+						? String(resolved).trim()
+						: "";
+		}
+
+		const absoluteCommonDir = resolve(commonDir);
+
+		// If we're in a worktree, common-dir is something like /path/to/repo/.git/worktrees/xyz
+		// We need to go up to find the actual repo directory
+		if (absoluteCommonDir.includes("/.git/worktrees/")) {
+			// Extract the repo directory: /path/to/repo/.git/worktrees/xyz -> /path/to/repo
+			const worktreesMatch = absoluteCommonDir.match(
+				/^(.+?\/\.git)\/worktrees\/.+$/,
+			);
+			const gitDir = worktreesMatch?.[1];
+			if (gitDir) {
+				// Return the parent of .git directory (the main repo)
+				return resolve(gitDir, "..");
+			}
+		}
+
+		// If not a worktree, common-dir is just .git, so return parent (the main repo)
+		return resolve(absoluteCommonDir, "..");
+	} catch {
+		// Fallback: try to get the root of the git repository
+		// Note: This returns the worktree directory if we're in a worktree, not the main repo
+		// So we only use this as a last resort
+		try {
+			const rootResult = run`git rev-parse --show-toplevel`;
+			let root: string;
+			if (
+				typeof rootResult === "object" &&
+				rootResult !== null &&
+				"text" in rootResult &&
+				typeof rootResult.text === "function"
+			) {
+				root = (await rootResult.text()).trim();
+			} else {
+				const resolved = await rootResult;
+				root =
+					typeof resolved === "string"
+						? resolved.trim()
+						: resolved !== null && resolved !== undefined
+							? String(resolved).trim()
+							: "";
+			}
+			// This might be a worktree directory, so we need to check
+			// If it's a worktree, we need to find the main repo
+			// Try to read the .git file to find the main repo
+			const gitFile = resolve(root, ".git");
+			try {
+				const { readFileSync } = await import("node:fs");
+				const gitContent = readFileSync(gitFile, "utf8").trim();
+				// .git file in worktree contains: gitdir: /path/to/main/repo/.git/worktrees/worktree-name
+				if (gitContent.startsWith("gitdir: ")) {
+					const gitDirPath = gitContent.slice(8).trim();
+					const absoluteGitDir = resolve(gitDirPath);
+					if (absoluteGitDir.includes("/.git/worktrees/")) {
+						const worktreesMatch = absoluteGitDir.match(
+							/^(.+?\/\.git)\/worktrees\/.+$/,
+						);
+						const mainGitDir = worktreesMatch?.[1];
+						if (mainGitDir) {
+							return resolve(mainGitDir, "..");
+						}
+					}
+				}
+			} catch {
+				// If we can't read .git file, assume root is the main repo
+			}
+			return resolve(root);
+		} catch {
+			// Last resort: use current directory
+			return process.cwd();
+		}
+	}
+}
+
+/**
+ * Create a command executor that runs git commands in a specific directory
+ * Uses process.chdir() to temporarily change directory
+ */
+function createDirExecutor(
+	baseExecutor: CommandExecutor | typeof $,
+	dir: string,
+): CommandExecutor {
+	return async (strings: TemplateStringsArray, ...values: unknown[]) => {
+		// Save current directory
+		const originalCwd = process.cwd();
+		try {
+			// Change to target directory
+			process.chdir(dir);
+			// Execute the command
+			// Cast values to work around Bun's ShellExpression type requirements
+			// biome-ignore lint/suspicious/noExplicitAny: Bun's $ template requires ShellExpression types
+			return await baseExecutor(strings, ...(values as any[]));
+		} finally {
+			// Always restore original directory
+			process.chdir(originalCwd);
+		}
+	};
+}
+
 export const finishCommand: CommandDefinition = {
 	name: "finish",
 	description:
@@ -342,6 +470,9 @@ export const finishCommand: CommandDefinition = {
 			// we need to handle this differently
 			stdout(`\n🔀 Checking out base branch: ${baseBranch}`);
 			let baseBranchCheckedOut = false;
+			let mainRepoDir: string | null = null;
+			let mainRepoRun: CommandExecutor | typeof $ | null = null;
+
 			try {
 				await run`git checkout ${baseBranch}`;
 				baseBranchCheckedOut = true;
@@ -376,34 +507,48 @@ export const finishCommand: CommandDefinition = {
 					fullErrorText.includes("bereits in");
 
 				if (isAlreadyCheckedOut) {
-					stderr(
-						`\n⚠️  ${baseBranch} is already checked out elsewhere (likely in main repo).`,
+					// Base branch is checked out in main repo - we'll merge from there
+					stdout(
+						`   Base branch is checked out in main repo, merging from there...`,
 					);
-					stderr(
-						`   Please run this command from the main repository directory, or`,
-					);
-					stderr(
-						`   checkout ${baseBranch} in the main repo and run the merge manually.`,
-					);
-					stderr(`\n   Alternatively, you can:`);
-					stderr(
-						`   1. Push your current branch: git push origin ${currentBranch}`,
-					);
-					stderr(
-						`   2. Go to main repo and merge: git checkout ${baseBranch} && git merge ${currentBranch}`,
-					);
-					stderr(`   3. Push: git push origin ${baseBranch}`);
-					return 1;
+					try {
+						mainRepoDir = await getMainRepoDir(run);
+						stdout(`   Main repo directory: ${mainRepoDir}`);
+						mainRepoRun = createDirExecutor(run, mainRepoDir);
+						baseBranchCheckedOut = true; // We'll use main repo executor
+					} catch {
+						stderr(
+							`\n⚠️  ${baseBranch} is already checked out elsewhere, but could not detect main repo directory.`,
+						);
+						stderr(
+							`   Please run this command from the main repository directory, or`,
+						);
+						stderr(
+							`   checkout ${baseBranch} in the main repo and run the merge manually.`,
+						);
+						stderr(`\n   Alternatively, you can:`);
+						stderr(
+							`   1. Push your current branch: git push origin ${currentBranch}`,
+						);
+						stderr(
+							`   2. Go to main repo and merge: git checkout ${baseBranch} && git merge ${currentBranch}`,
+						);
+						stderr(`   3. Push: git push origin ${baseBranch}`);
+						return 1;
+					}
 				} else {
 					throw error;
 				}
 			}
 
+			// Use main repo executor if we're merging from main repo, otherwise use regular executor
+			const mergeRun = mainRepoRun ?? run;
+
 			// Step 6: Pull latest changes for base branch
 			if (baseBranchCheckedOut) {
 				stdout(`📥 Pulling latest changes for ${baseBranch}...`);
 				try {
-					await run`git pull origin ${baseBranch}`;
+					await mergeRun`git pull origin ${baseBranch}`;
 				} catch {
 					// If pull fails, it might be because the branch doesn't exist remotely yet
 					// That's okay, we'll continue
@@ -416,7 +561,7 @@ export const finishCommand: CommandDefinition = {
 			// Step 7: Merge feature branch into base branch
 			stdout(`\n🔀 Merging ${currentBranch} into ${baseBranch}...`);
 			try {
-				await run`git merge ${currentBranch} --no-edit`;
+				await mergeRun`git merge ${currentBranch} --no-edit`;
 				stdout(`✅ Successfully merged ${currentBranch} into ${baseBranch}`);
 			} catch (error) {
 				// Check if it's a merge conflict
@@ -431,7 +576,12 @@ export const finishCommand: CommandDefinition = {
 					);
 					stderr(`   Current branch: ${currentBranch}`);
 					stderr(`   Base branch: ${baseBranch}`);
-					stderr(`   Resolve conflicts and then run: git commit`);
+					if (mainRepoDir) {
+						stderr(`   Go to main repo: cd ${mainRepoDir}`);
+						stderr(`   Resolve conflicts and then run: git commit`);
+					} else {
+						stderr(`   Resolve conflicts and then run: git commit`);
+					}
 					return 1;
 				}
 				throw error;
@@ -440,7 +590,7 @@ export const finishCommand: CommandDefinition = {
 			// Step 8: Push updated base branch
 			if (baseBranchCheckedOut) {
 				stdout(`\n📤 Pushing ${baseBranch} to origin...`);
-				await run`git push origin ${baseBranch}`;
+				await mergeRun`git push origin ${baseBranch}`;
 				stdout(`✅ Pushed ${baseBranch} to origin`);
 			}
 
