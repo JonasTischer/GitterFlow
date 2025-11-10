@@ -1,6 +1,6 @@
-import { createInterface } from "node:readline";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { $ } from "bun";
 import type { CommandDefinition } from "./types";
 
