@@ -6,3 +6,4 @@ delete_remote_on_finish: false
 ide: cursor
 symlink_files:
   - .env.local
+  - node_modules

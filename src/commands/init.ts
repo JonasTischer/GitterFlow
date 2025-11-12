@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import * as p from "@clack/prompts";
 import { stringify } from "yaml";
+import { scanForSymlinkCandidates } from "../utils/scanner";
 import type { CommandDefinition } from "./types";
 
 interface Config {
@@ -278,60 +279,66 @@ export const initCommand: CommandDefinition = {
 
 		let symlinkFiles: string[] = [];
 		if (useSymlinks) {
-			const selectedSymlinks = await p.multiselect({
-				message: "Which files/directories should be symlinked?",
-				options: [
-					{ value: ".env", label: ".env (environment variables)" },
-					{ value: ".env.local", label: ".env.local (local environment)" },
-					{
-						value: ".env.development",
-						label: ".env.development (dev environment)",
-					},
-					{
-						value: "node_modules",
-						label: "node_modules (Node.js dependencies)",
-					},
-					{ value: ".venv", label: ".venv (Python virtual environment)" },
-					{ value: "build", label: "build (build output directory)" },
-					{ value: "dist", label: "dist (distribution directory)" },
-				],
-			});
+			// Scan the current repository for symlink candidates
+			const repoRoot = process.cwd();
+			const candidates = scanForSymlinkCandidates(repoRoot);
 
-			if (p.isCancel(selectedSymlinks)) {
-				p.cancel("Initialization cancelled.");
-				return 0;
-			}
+			if (candidates.length === 0) {
+				stdout(
+					"⚠️  No symlink candidates found in your repository (no .env, node_modules, .venv, etc.)",
+				);
+				stdout(
+					"   You can manually add files to symlink_files in .gitterflow.yaml later.",
+				);
+			} else {
+				// Show found candidates for selection
+				const options = candidates.map((path) => ({
+					value: path,
+					label: path,
+				}));
 
-			symlinkFiles = selectedSymlinks as string[];
-
-			// Ask if they want to add custom files
-			const addCustom = await p.confirm({
-				message: "Add custom files/directories to symlink?",
-				initialValue: false,
-			});
-
-			if (p.isCancel(addCustom)) {
-				p.cancel("Initialization cancelled.");
-				return 0;
-			}
-
-			if (addCustom) {
-				const customFiles = await p.text({
-					message: "Enter custom files/directories (comma-separated)",
-					placeholder: "vendor, .cache, custom-dir",
+				const selectedSymlinks = await p.multiselect({
+					message: `Found ${candidates.length} symlink candidate(s) in your project. Select which to symlink:`,
+					options,
+					required: false,
 				});
 
-				if (p.isCancel(customFiles)) {
+				if (p.isCancel(selectedSymlinks)) {
 					p.cancel("Initialization cancelled.");
 					return 0;
 				}
 
-				if (customFiles && customFiles.trim() !== "") {
-					const customList = customFiles
-						.split(",")
-						.map((f) => f.trim())
-						.filter((f) => f !== "");
-					symlinkFiles = [...symlinkFiles, ...customList];
+				symlinkFiles = selectedSymlinks as string[];
+
+				// Ask if they want to add custom files
+				const addCustom = await p.confirm({
+					message: "Add additional custom files/directories to symlink?",
+					initialValue: false,
+				});
+
+				if (p.isCancel(addCustom)) {
+					p.cancel("Initialization cancelled.");
+					return 0;
+				}
+
+				if (addCustom) {
+					const customFiles = await p.text({
+						message: "Enter custom files/directories (comma-separated)",
+						placeholder: "vendor, .cache, custom-dir",
+					});
+
+					if (p.isCancel(customFiles)) {
+						p.cancel("Initialization cancelled.");
+						return 0;
+					}
+
+					if (customFiles && customFiles.trim() !== "") {
+						const customList = customFiles
+							.split(",")
+							.map((f) => f.trim())
+							.filter((f) => f !== "");
+						symlinkFiles = [...symlinkFiles, ...customList];
+					}
 				}
 			}
 		}
