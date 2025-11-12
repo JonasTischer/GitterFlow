@@ -420,8 +420,7 @@ function createDirExecutor(
 
 export const finishCommand: CommandDefinition = {
 	name: "finish",
-	description:
-		"Merge current branch into base branch, push changes, and optionally clean up",
+	description: "Merge current branch into base branch and optionally clean up",
 	usage: "gitterflow finish",
 	run: async ({ stderr, stdout, exec }) => {
 		const run = exec ?? $;
@@ -603,12 +602,10 @@ export const finishCommand: CommandDefinition = {
 				throw error;
 			}
 
-			// Step 8: Push updated base branch
-			if (baseBranchCheckedOut) {
-				stdout(`\n📤 Pushing ${baseBranch} to origin...`);
-				await mergeRun`git push origin ${baseBranch}`;
-				stdout(`✅ Pushed ${baseBranch} to origin`);
-			}
+			// Step 8: Skip pushing - user will push manually
+			stdout(
+				`\n💡 Merge complete. To push, run: git push origin ${baseBranch}`,
+			);
 
 			// Step 9: Cleanup options
 			const deleteRemoteOnFinish = getSetting("delete_remote_on_finish");
@@ -690,7 +687,7 @@ export const finishCommand: CommandDefinition = {
 			// Success summary
 			stdout(`\n✅ Successfully finished work on ${currentBranch}`);
 			stdout(`   Merged into: ${baseBranch}`);
-			stdout(`   Pushed to: origin/${baseBranch}`);
+			stdout(`   To push: git push origin ${baseBranch}`);
 
 			return 0;
 		} catch (error) {

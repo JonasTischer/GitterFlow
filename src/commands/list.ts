@@ -132,7 +132,9 @@ export const listCommand: CommandDefinition = {
 					messages.push(`🚀 Opened terminal in worktree: ${selectedPath}`);
 				}
 				if (messages.length > 0) {
-					messages.forEach((msg) => stdout(msg));
+					for (const msg of messages) {
+						stdout(msg);
+					}
 					stdout(`🤖 Running coding agent: ${agentCommand}`);
 				}
 			} catch (error) {

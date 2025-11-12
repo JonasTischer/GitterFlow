@@ -411,7 +411,7 @@ describe("delete command", () => {
 		 * Expected: Command should detect flag and list all worktrees
 		 */
 		test("should detect --all flag", async () => {
-			const { exec, calls } = captureExec();
+			const { calls } = captureExec();
 			const { io } = commandIO();
 
 			// Mock git worktree list output
@@ -466,7 +466,7 @@ describe("delete command", () => {
 		 * Expected: Should work same as --all
 		 */
 		test("should detect -a short flag", async () => {
-			const { exec, calls } = captureExec();
+			const { calls } = captureExec();
 			const { io } = commandIO();
 
 			const mockWorktreeList = `/path/to/repo  abc123 [main]
@@ -519,7 +519,7 @@ describe("delete command", () => {
 		 * Expected: Main repo should be excluded from deletion list
 		 */
 		test("should exclude main repo from deletion", async () => {
-			const { exec, calls } = captureExec();
+			const { calls } = captureExec();
 			const { io, stdoutMessages } = commandIO();
 
 			const mainRepoPath = "/path/to/repo";
@@ -591,7 +591,7 @@ describe("delete command", () => {
 		 * Expected: All should be deleted (except main repo)
 		 */
 		test("should delete all worktrees", async () => {
-			const { exec, calls } = captureExec();
+			const { calls } = captureExec();
 			const { io, stdoutMessages } = commandIO();
 
 			const mainRepoPath = "/path/to/repo";
@@ -659,7 +659,7 @@ describe("delete command", () => {
 		 * Expected: Should show message and exit successfully
 		 */
 		test("should handle empty worktree list gracefully", async () => {
-			const { exec } = captureExec();
+			captureExec();
 			const { io, stdoutMessages } = commandIO();
 
 			const mainRepoPath = "/path/to/repo";
@@ -667,7 +667,7 @@ describe("delete command", () => {
 
 			const execWithMock = async (
 				strings: TemplateStringsArray,
-				...values: unknown[]
+				..._values: unknown[]
 			) => {
 				const command = strings.join("");
 
@@ -714,7 +714,7 @@ describe("delete command", () => {
 		 * Expected: Should continue deleting others and report failures
 		 */
 		test("should handle partial deletion failures", async () => {
-			const { exec } = captureExec();
+			captureExec();
 			const { io, stdoutMessages, stderrMessages } = commandIO();
 
 			const mainRepoPath = "/path/to/repo";
@@ -725,7 +725,7 @@ describe("delete command", () => {
 			let deleteCallCount = 0;
 			const execWithMock = async (
 				strings: TemplateStringsArray,
-				...values: unknown[]
+				..._values: unknown[]
 			) => {
 				const command = strings.join("");
 
@@ -810,7 +810,7 @@ describe("delete command", () => {
 		 * Expected: Should show which worktrees will be deleted
 		 */
 		test("should display worktrees to be deleted", async () => {
-			const { exec } = captureExec();
+			captureExec();
 			const { io, stdoutMessages } = commandIO();
 
 			const mainRepoPath = "/path/to/repo";
@@ -820,7 +820,7 @@ describe("delete command", () => {
 
 			const execWithMock = async (
 				strings: TemplateStringsArray,
-				...values: unknown[]
+				..._values: unknown[]
 			) => {
 				const command = strings.join("");
 
