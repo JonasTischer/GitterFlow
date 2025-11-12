@@ -11,6 +11,7 @@ export interface GitterflowConfig {
 	coding_agent: string;
 	terminal: string;
 	ide: string | null;
+	symlink_files: string[];
 }
 
 let cachedConfig: GitterflowConfig | null = null;
@@ -30,6 +31,7 @@ export function loadConfig(): GitterflowConfig {
 			coding_agent: "claude",
 			terminal: "iterm",
 			ide: null,
+			symlink_files: [],
 		};
 		return cachedConfig;
 	}
@@ -47,6 +49,7 @@ export function loadConfig(): GitterflowConfig {
 		coding_agent: parsed.coding_agent ?? "claude",
 		terminal: parsed.terminal ?? "iterm",
 		ide: parsed.ide ?? null,
+		symlink_files: parsed.symlink_files ?? [],
 	};
 
 	return cachedConfig;

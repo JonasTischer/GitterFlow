@@ -332,8 +332,7 @@ describe("delete command (integration)", () => {
 			const cliPath = join(process.cwd(), "src/index.ts");
 
 			// Delete all (should find no worktrees to delete)
-			const result =
-				await $`cd ${repoPath} && bun ${cliPath} delete --all`;
+			const result = await $`cd ${repoPath} && bun ${cliPath} delete --all`;
 
 			const stdout = result.stdout.toString();
 
@@ -397,7 +396,8 @@ describe("delete command (integration)", () => {
 			await $`cd ${repoPath} && bun ${cliPath} new short-flag-test`.quiet();
 
 			// Delete using -a flag
-			const result = await $`cd ${repoPath} && bun ${cliPath} delete -a`.quiet();
+			const result =
+				await $`cd ${repoPath} && bun ${cliPath} delete -a`.quiet();
 
 			expect(result.exitCode).toBe(0);
 

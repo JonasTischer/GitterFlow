@@ -18,6 +18,7 @@ interface Config {
 	open_terminal: boolean;
 	delete_remote_on_finish: boolean;
 	ide: string | null;
+	symlink_files: string[];
 }
 
 type ShellType = "zsh" | "bash" | "fish" | "unknown";
@@ -263,6 +264,78 @@ export const initCommand: CommandDefinition = {
 			}
 		}
 
+		// Ask about symlink files
+		const useSymlinks = await p.confirm({
+			message:
+				"Automatically symlink files/directories to worktrees? (e.g., .env, node_modules)",
+			initialValue: false,
+		});
+
+		if (p.isCancel(useSymlinks)) {
+			p.cancel("Initialization cancelled.");
+			return 0;
+		}
+
+		let symlinkFiles: string[] = [];
+		if (useSymlinks) {
+			const selectedSymlinks = await p.multiselect({
+				message: "Which files/directories should be symlinked?",
+				options: [
+					{ value: ".env", label: ".env (environment variables)" },
+					{ value: ".env.local", label: ".env.local (local environment)" },
+					{
+						value: ".env.development",
+						label: ".env.development (dev environment)",
+					},
+					{
+						value: "node_modules",
+						label: "node_modules (Node.js dependencies)",
+					},
+					{ value: ".venv", label: ".venv (Python virtual environment)" },
+					{ value: "build", label: "build (build output directory)" },
+					{ value: "dist", label: "dist (distribution directory)" },
+				],
+			});
+
+			if (p.isCancel(selectedSymlinks)) {
+				p.cancel("Initialization cancelled.");
+				return 0;
+			}
+
+			symlinkFiles = selectedSymlinks as string[];
+
+			// Ask if they want to add custom files
+			const addCustom = await p.confirm({
+				message: "Add custom files/directories to symlink?",
+				initialValue: false,
+			});
+
+			if (p.isCancel(addCustom)) {
+				p.cancel("Initialization cancelled.");
+				return 0;
+			}
+
+			if (addCustom) {
+				const customFiles = await p.text({
+					message: "Enter custom files/directories (comma-separated)",
+					placeholder: "vendor, .cache, custom-dir",
+				});
+
+				if (p.isCancel(customFiles)) {
+					p.cancel("Initialization cancelled.");
+					return 0;
+				}
+
+				if (customFiles && customFiles.trim() !== "") {
+					const customList = customFiles
+						.split(",")
+						.map((f) => f.trim())
+						.filter((f) => f !== "");
+					symlinkFiles = [...symlinkFiles, ...customList];
+				}
+			}
+		}
+
 		// Ask whether to delete remote branches after merging
 		const deleteRemoteOnFinish = await p.confirm({
 			message: "Delete remote branches after merging?",
@@ -282,6 +355,7 @@ export const initCommand: CommandDefinition = {
 			open_terminal: openTerminal ?? true,
 			delete_remote_on_finish: deleteRemoteOnFinish ?? false,
 			ide: ideName,
+			symlink_files: symlinkFiles,
 		};
 
 		// Write config to file
@@ -302,6 +376,9 @@ export const initCommand: CommandDefinition = {
 			stdout(`   AI model: ${config.ai_model}`);
 			stdout(`   Auto-open terminal: ${config.open_terminal ? "Yes" : "No"}`);
 			stdout(`   IDE: ${config.ide || "None"}`);
+			stdout(
+				`   Symlink files: ${config.symlink_files.length > 0 ? config.symlink_files.join(", ") : "None"}`,
+			);
 			stdout(`   Delete remote on finish: ${config.delete_remote_on_finish}`);
 			stdout(`\n📁 Config file: ${configPath}`);
 

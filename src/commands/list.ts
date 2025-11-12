@@ -1,6 +1,6 @@
-import { $ } from "bun";
-import * as p from "@clack/prompts";
 import { resolve } from "node:path";
+import * as p from "@clack/prompts";
+import { $ } from "bun";
 import { getSetting } from "../config";
 import { spawnTerminal } from "../utils/terminal";
 import type { CommandDefinition } from "./types";

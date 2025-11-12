@@ -1,5 +1,5 @@
-import { $ } from "bun";
 import { resolve } from "node:path";
+import { $ } from "bun";
 import { getSetting } from "../config";
 import type { CommandDefinition, CommandExecutor } from "./types";
 

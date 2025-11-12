@@ -1,5 +1,5 @@
-import { $ } from "bun";
 import * as p from "@clack/prompts";
+import { $ } from "bun";
 import { getSetting } from "../config";
 import type { CommandDefinition } from "./types";
 

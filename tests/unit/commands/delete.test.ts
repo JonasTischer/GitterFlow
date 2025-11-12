@@ -454,9 +454,9 @@ describe("delete command", () => {
 			});
 
 			// Should call git worktree list
-			expect(calls.some((c) => c.strings.join("").includes("git worktree list"))).toBe(
-				true,
-			);
+			expect(
+				calls.some((c) => c.strings.join("").includes("git worktree list")),
+			).toBe(true);
 		});
 
 		/**
@@ -507,9 +507,9 @@ describe("delete command", () => {
 			});
 
 			// Should call git worktree list
-			expect(calls.some((c) => c.strings.join("").includes("git worktree list"))).toBe(
-				true,
-			);
+			expect(
+				calls.some((c) => c.strings.join("").includes("git worktree list")),
+			).toBe(true);
 		});
 
 		/**
@@ -699,9 +699,10 @@ describe("delete command", () => {
 			});
 
 			expect(exitCode).toBe(0);
-			const noWorktreesMessage = stdoutMessages.find((msg) =>
-				msg.includes("No worktrees to delete") ||
-				msg.includes("only main repository found"),
+			const noWorktreesMessage = stdoutMessages.find(
+				(msg) =>
+					msg.includes("No worktrees to delete") ||
+					msg.includes("only main repository found"),
 			);
 			expect(noWorktreesMessage).toBeDefined();
 		});

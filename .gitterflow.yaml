@@ -4,3 +4,5 @@ ai_model: qwen/qwen3-235b-a22b-2507
 open_terminal: true
 delete_remote_on_finish: false
 ide: cursor
+symlink_files:
+  - .env.local

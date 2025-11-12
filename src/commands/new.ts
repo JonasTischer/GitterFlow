@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { $ } from "bun";
 import { getSetting } from "../config";
+import { createSymlinks } from "../utils/symlink";
 import { spawnTerminal } from "../utils/terminal";
 import type { CommandDefinition } from "./types";
 
@@ -87,8 +88,19 @@ export const newCommand: CommandDefinition = {
 			// This allows finish command to know which branch to merge into
 			await run`git config branch.${trimmedBranch}.gitterflow-base-branch ${currentBranch}`;
 
-			// Resolve to absolute path
+			// Resolve to absolute paths
 			const absoluteWorktreePath = resolve(worktreePath);
+			const absoluteMainRepoPath = process.cwd();
+
+			// Create symlinks for configured files/directories
+			const symlinkFiles = getSetting("symlink_files");
+			if (symlinkFiles.length > 0) {
+				createSymlinks(
+					absoluteMainRepoPath,
+					absoluteWorktreePath,
+					symlinkFiles,
+				);
+			}
 
 			// Output informative messages
 			stdout(`✅ Created worktree for branch ${trimmedBranch}`);
