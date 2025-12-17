@@ -368,6 +368,11 @@ describe("snap command", () => {
 				if (strings.join("").includes("git commit -m")) {
 					return {};
 				}
+				if (strings.join("").includes("git status --porcelain")) {
+					return {
+						text: async () => "",
+					};
+				}
 				return {};
 			};
 
@@ -406,6 +411,11 @@ describe("snap command", () => {
 				if (strings.join("").includes("git commit -m")) {
 					return {};
 				}
+				if (strings.join("").includes("git status --porcelain")) {
+					return {
+						text: async () => "",
+					};
+				}
 				return {};
 			};
 
@@ -419,6 +429,202 @@ describe("snap command", () => {
 				stdoutMessages.some((msg) =>
 					msg.includes("📝 Generated commit message:"),
 				),
+			).toBe(true);
+		});
+	});
+
+	describe("pre-commit hook handling", () => {
+		test("should amend commit when pre-commit hook modifies files", async () => {
+			const { calls } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+			process.env.OPENROUTER_API_KEY = "test-key";
+
+			const mockExec = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git diff --cached")) {
+					return {
+						text: async () => "some diff",
+					};
+				}
+				if (command.includes("git add -A")) {
+					return {};
+				}
+				if (command.includes("git commit -m")) {
+					return {};
+				}
+				if (command.includes("git status --porcelain")) {
+					// Simulate formatter modifying files
+					return {
+						text: async () => " M src/file.ts\n",
+					};
+				}
+				if (command.includes("git commit --amend --no-edit")) {
+					return {};
+				}
+				return {};
+			};
+
+			const exitCode = await snapCommand.run({
+				args: ["--no-confirm"],
+				exec: mockExec,
+				...io,
+			});
+
+			expect(exitCode).toBe(0);
+
+			// Should call git add -A again after commit
+			const addCalls = calls.filter((call) =>
+				call.strings.join("").includes("git add -A"),
+			);
+			expect(addCalls.length).toBeGreaterThanOrEqual(2);
+
+			// Should call git commit --amend --no-edit
+			const amendCall = calls.find((call) =>
+				call.strings.join("").includes("git commit --amend --no-edit"),
+			);
+			expect(amendCall).toBeDefined();
+
+			// Should show message about amending
+			expect(
+				stdoutMessages.some((msg) =>
+					msg.includes("Pre-commit hook modified files"),
+				),
+			).toBe(true);
+		});
+
+		test("should not amend when no files modified after commit", async () => {
+			const { calls } = captureExec();
+			const { io } = commandIO();
+			process.env.OPENROUTER_API_KEY = "test-key";
+
+			const mockExec = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git diff --cached")) {
+					return {
+						text: async () => "some diff",
+					};
+				}
+				if (command.includes("git add -A")) {
+					return {};
+				}
+				if (command.includes("git commit -m")) {
+					return {};
+				}
+				if (command.includes("git status --porcelain")) {
+					// No modified files - clean status
+					return {
+						text: async () => "",
+					};
+				}
+				return {};
+			};
+
+			const exitCode = await snapCommand.run({
+				args: ["--no-confirm"],
+				exec: mockExec,
+				...io,
+			});
+
+			expect(exitCode).toBe(0);
+
+			// Should NOT call git commit --amend
+			const amendCall = calls.find((call) =>
+				call.strings.join("").includes("git commit --amend"),
+			);
+			expect(amendCall).toBeUndefined();
+		});
+
+		test("should show helpful message when pre-commit hook fails", async () => {
+			const { calls } = captureExec();
+			const { io, stderrMessages } = commandIO();
+			process.env.OPENROUTER_API_KEY = "test-key";
+
+			const mockExec = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git diff --cached")) {
+					return {
+						text: async () => "some diff",
+					};
+				}
+				if (command.includes("git add -A")) {
+					return {};
+				}
+				if (command.includes("git commit -m")) {
+					// Simulate pre-commit hook failure
+					throw new Error("pre-commit hook failed: eslint found errors");
+				}
+				return {};
+			};
+
+			const exitCode = await snapCommand.run({
+				args: ["--no-confirm"],
+				exec: mockExec,
+				...io,
+			});
+
+			expect(exitCode).toBe(1);
+
+			// Should show helpful error message
+			expect(
+				stderrMessages.some((msg) => msg.includes("Pre-commit hook failed")),
+			).toBe(true);
+			expect(
+				stderrMessages.some((msg) => msg.includes("changes are still staged")),
+			).toBe(true);
+			expect(stderrMessages.some((msg) => msg.includes("gf snap"))).toBe(true);
+		});
+
+		test("should detect hook failure from error message containing 'hook'", async () => {
+			const { calls } = captureExec();
+			const { io, stderrMessages } = commandIO();
+			process.env.OPENROUTER_API_KEY = "test-key";
+
+			const mockExec = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				calls.push({ strings: Array.from(strings), values });
+				const command = strings.join("");
+
+				if (command.includes("git diff --cached")) {
+					return {
+						text: async () => "some diff",
+					};
+				}
+				if (command.includes("git add -A")) {
+					return {};
+				}
+				if (command.includes("git commit -m")) {
+					// Git error message mentioning hook
+					throw new Error("hook 'pre-commit' exited with status 1");
+				}
+				return {};
+			};
+
+			const exitCode = await snapCommand.run({
+				args: ["--no-confirm"],
+				exec: mockExec,
+				...io,
+			});
+
+			expect(exitCode).toBe(1);
+			expect(
+				stderrMessages.some((msg) => msg.includes("Pre-commit hook failed")),
 			).toBe(true);
 		});
 	});

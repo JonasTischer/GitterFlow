@@ -159,10 +159,17 @@ export const snapCommand: CommandDefinition = {
 	name: "snap",
 	description:
 		"Automatically commit staged or modified changes with AI-generated commit message",
-	usage: "gitterflow snap [--no-confirm]",
+	usage: "gitterflow snap [--no-confirm] [-m <message>]",
 	run: async ({ args, stderr, stdout, exec }) => {
 		const noConfirm = args.includes("--no-confirm");
 		const run = exec ?? $;
+
+		// Check for custom message via -m or --message flag
+		let customMessage: string | null = null;
+		const messageIndex = args.findIndex((a) => a === "-m" || a === "--message");
+		if (messageIndex !== -1 && args[messageIndex + 1]) {
+			customMessage = args[messageIndex + 1] ?? null;
+		}
 
 		try {
 			// Stage all modified and deleted files
@@ -199,16 +206,22 @@ export const snapCommand: CommandDefinition = {
 				return 0;
 			}
 
-			// Generate commit message using AI
-			stdout("🤖 Generating commit message...");
-			const generatedMessage = await generateCommitMessage(diff);
+			let generatedMessage: string;
 
-			// Print the generated message
-			stdout(`\n📝 Generated commit message:\n   ${generatedMessage}\n`);
+			if (customMessage) {
+				// Use custom message, skip AI generation
+				generatedMessage = customMessage;
+				stdout(`📝 Using provided commit message:\n   ${generatedMessage}\n`);
+			} else {
+				// Generate commit message using AI
+				stdout("🤖 Generating commit message...");
+				generatedMessage = await generateCommitMessage(diff);
+				stdout(`\n📝 Generated commit message:\n   ${generatedMessage}\n`);
+			}
 
 			// Ask for confirmation unless --no-confirm flag is set
 			let commitMessage: string | null = generatedMessage;
-			if (!noConfirm) {
+			if (!noConfirm && !customMessage) {
 				commitMessage = await promptCommitMessage(generatedMessage);
 			}
 
@@ -219,21 +232,74 @@ export const snapCommand: CommandDefinition = {
 
 			// Commit with the message (original or edited)
 			await run`git commit -m ${commitMessage}`;
+
+			// Check if pre-commit hooks modified any files (e.g., formatters)
+			// If so, stage those changes and amend the commit
+			const statusResult = run`git status --porcelain`;
+			let status: string;
+			if (
+				typeof statusResult === "object" &&
+				statusResult !== null &&
+				"text" in statusResult &&
+				typeof statusResult.text === "function"
+			) {
+				status = await statusResult.text();
+			} else {
+				const resolved = await statusResult;
+				status =
+					typeof resolved === "string"
+						? resolved
+						: typeof resolved === "object" &&
+								resolved !== null &&
+								"text" in resolved &&
+								typeof resolved.text === "function"
+							? await resolved.text()
+							: String(resolved);
+			}
+
+			if (status.trim().length > 0) {
+				// Pre-commit hook modified files, amend the commit to include them
+				// Use --no-verify to avoid running the hook again during amend
+				stdout("📝 Pre-commit hook modified files, amending commit...");
+				await run`git add -A`;
+				await run`git commit --amend --no-edit --no-verify`;
+			}
+
 			stdout(`✅ Commit created: ${commitMessage}`);
 
 			return 0;
 		} catch (error) {
-			if (error instanceof Error) {
-				if (error.message.includes("OPENROUTER_API_KEY")) {
-					stderr(`❌ ${error.message}`);
-					stderr("Please set OPENROUTER_API_KEY environment variable.");
-				} else if (error.message.includes("OpenRouter API error")) {
-					stderr(`❌ ${error.message}`);
-				} else {
-					stderr(`❌ Failed to create commit: ${error.message}`);
-				}
+			const errorMsg = error instanceof Error ? error.message : String(error);
+
+			// Check for Bun shell error stderr (contains actual git output)
+			const shellError = error as {
+				stderr?: { toString(): string } | string;
+				exitCode?: number;
+			};
+			const stderrOutput =
+				typeof shellError.stderr === "string"
+					? shellError.stderr
+					: (shellError.stderr?.toString?.() ?? "");
+
+			// Combine error message and stderr for detection
+			const fullError = `${errorMsg}\n${stderrOutput}`.toLowerCase();
+
+			if (errorMsg.includes("OPENROUTER_API_KEY")) {
+				stderr(`❌ ${errorMsg}`);
+				stderr("Please set OPENROUTER_API_KEY environment variable.");
+			} else if (errorMsg.includes("OpenRouter API error")) {
+				stderr(`❌ ${errorMsg}`);
+			} else if (
+				fullError.includes("hook") ||
+				fullError.includes("pre-commit") ||
+				// Also detect git commit failures with exit code 1 (likely hook failure)
+				(shellError.exitCode === 1 && errorMsg.includes("exit code"))
+			) {
+				// Pre-commit hook failed
+				stderr(`\n❌ Pre-commit hook failed. Your changes are still staged.`);
+				stderr(`   Fix the issues above, then run 'gf snap' again.`);
 			} else {
-				stderr(`❌ Failed to create commit: ${String(error)}`);
+				stderr(`❌ Failed to create commit: ${errorMsg}`);
 			}
 			return 1;
 		}

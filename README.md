@@ -176,14 +176,25 @@ Removes a worktree for the specified branch.
 - Deletes the worktree directory
 - Removes the git worktree reference
 
-### `gitterflow snap [--no-confirm]`
+### `gitterflow snap [--no-confirm] [-m <message>]`
 
 Automatically commits staged or modified changes with an AI-generated commit message.
 
 - Stages all changes (`git add -A`)
-- Generates commit message using OpenRouter API
+- Generates commit message using OpenRouter API (or use `-m` to provide your own)
 - Interactive confirmation: **y** (yes), **e** (edit), **n** (cancel)
-- Commits with `--no-verify` flag
+- Runs git hooks normally (no `--no-verify`)
+
+**Options:**
+- `--no-confirm` - Skip confirmation prompt, commit immediately with AI message
+- `-m <message>` or `--message <message>` - Use custom commit message (skips AI generation)
+
+**Pre-commit Hook Handling:**
+
+`snap` intelligently handles pre-commit hooks that modify files (e.g., formatters like Prettier, ESLint --fix):
+
+1. If the hook **modifies files** (formatter runs), `snap` automatically stages those changes and amends the commit
+2. If the hook **fails** (lint errors, etc.), `snap` shows a helpful message and your changes remain staged — just fix the issues and run `gf snap` again
 
 ### `gitterflow finish`
 
