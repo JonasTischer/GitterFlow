@@ -101,7 +101,7 @@ exit 0
 			// Verify only one commit was made (the amend replaced the original)
 			const commitCount =
 				await $`git -C ${repoPath} rev-list --count HEAD`.text();
-			expect(parseInt(commitCount.trim())).toBe(2); // Initial + our commit
+			expect(parseInt(commitCount.trim(), 10)).toBe(2); // Initial + our commit
 		} finally {
 			await cleanup();
 		}
