@@ -218,7 +218,7 @@ export const snapCommand: CommandDefinition = {
 			}
 
 			// Commit with the message (original or edited)
-			await run`git commit -m ${commitMessage} --no-verify`;
+			await run`git commit -m ${commitMessage}`;
 			stdout(`✅ Commit created: ${commitMessage}`);
 
 			return 0;
