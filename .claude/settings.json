@@ -1,0 +1,23 @@
+{
+	"permissions": {
+		"allow": [
+			"WebFetch(domain:bun.sh)",
+			"Bash(bun --help test)",
+			"Bash(bun test:*)",
+			"WebSearch",
+			"WebFetch(domain:github.com)",
+			"WebFetch(domain:raw.githubusercontent.com)",
+			"WebFetch(domain:opentui.com)",
+			"WebFetch(domain:deepwiki.com)",
+			"Bash(bun run test:unit)",
+			"Bash(bun run check:*)",
+			"Bash(bun run check:fix:*)",
+			"Bash(bun run lint:*)",
+			"Bash(biome check:*)",
+			"Bash(bunx biome:*)",
+			"Bash(wc:*)"
+		],
+		"deny": [],
+		"ask": []
+	}
+}
