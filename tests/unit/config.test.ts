@@ -6,7 +6,7 @@ describe("GitterflowConfig", () => {
 		const config: GitterflowConfig = {
 			base_branch: "main",
 			worktrees_dir: "../worktrees",
-			ai_model: "qwen/qwen3-235b-a22b-2507",
+			ai_model: "google/gemini-3-flash-preview",
 			open_terminal: true,
 			delete_remote_on_finish: false,
 			coding_agent: "claude",
@@ -23,7 +23,7 @@ describe("GitterflowConfig", () => {
 		const config: GitterflowConfig = {
 			base_branch: "main",
 			worktrees_dir: "../worktrees",
-			ai_model: "qwen/qwen3-235b-a22b-2507",
+			ai_model: "google/gemini-3-flash-preview",
 			open_terminal: true,
 			delete_remote_on_finish: false,
 			coding_agent: "claude",

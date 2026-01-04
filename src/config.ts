@@ -25,7 +25,7 @@ export function loadConfig(): GitterflowConfig {
 		cachedConfig = {
 			base_branch: "main",
 			worktrees_dir: "../worktrees",
-			ai_model: "qwen/qwen3-235b-a22b-2507",
+			ai_model: "google/gemini-3-flash-preview",
 			open_terminal: true,
 			delete_remote_on_finish: false,
 			coding_agent: "claude",
@@ -43,7 +43,7 @@ export function loadConfig(): GitterflowConfig {
 	cachedConfig = {
 		base_branch: parsed.base_branch ?? "main",
 		worktrees_dir: parsed.worktrees_dir ?? "../worktrees",
-		ai_model: parsed.ai_model ?? "qwen/qwen3-235b-a22b-2507",
+		ai_model: parsed.ai_model ?? "google/gemini-3-flash-preview",
 		open_terminal: parsed.open_terminal ?? true,
 		delete_remote_on_finish: parsed.delete_remote_on_finish ?? false,
 		coding_agent: parsed.coding_agent ?? "claude",

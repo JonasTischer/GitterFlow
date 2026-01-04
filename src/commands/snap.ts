@@ -5,7 +5,7 @@ import type { CommandDefinition } from "./types";
 
 /**
  * Get the configured OpenRouter model from environment variable or config file
- * Defaults to "qwen/qwen3-235b-a22b-2507" if not configured
+ * Defaults to "google/gemini-3-flash-preview" if not configured
  */
 const _aiModel = getSetting("ai_model");
 

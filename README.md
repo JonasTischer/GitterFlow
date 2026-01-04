@@ -49,7 +49,7 @@ Run `gitterflow init` to interactively set up your configuration, or manually cr
 ```yaml
 base_branch: main
 worktrees_dir: ../worktrees
-ai_model: qwen/qwen3-235b-a22b-2507
+ai_model: google/gemini-3-flash-preview
 open_terminal: true
 delete_remote_on_finish: false
 coding_agent: claude
@@ -124,15 +124,15 @@ The `snap` command uses OpenRouter API to generate commit messages. Configure th
 
 1. **Environment variable**:
    ```bash
-   export GITTERFLOW_MODEL=qwen/qwen3-235b-a22b-2507  # or GF_MODEL, GITTERFLOW_OPENROUTER_MODEL, GF_OPENROUTER_MODEL
+   export GITTERFLOW_MODEL=google/gemini-3-flash-preview  # or GF_MODEL, GITTERFLOW_OPENROUTER_MODEL, GF_OPENROUTER_MODEL
    ```
 
 2. **Config file** (`.gitterflow.yaml`):
    ```yaml
-   ai_model: qwen/qwen3-235b-a22b-2507  # or "anthropic/claude-3.5-sonnet" or any OpenRouter model
+   ai_model: google/gemini-3-flash-preview  # or "anthropic/claude-3.5-sonnet" or any OpenRouter model
    ```
 
-3. **Default**: `qwen/qwen3-235b-a22b-2507` (if not configured)
+3. **Default**: `google/gemini-3-flash-preview` (if not configured)
 
 **Note:** You need to set `OPENROUTER_API_KEY` environment variable to use the `snap` command.
 

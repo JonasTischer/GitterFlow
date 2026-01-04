@@ -201,8 +201,8 @@ export const initCommand: CommandDefinition = {
 		// Ask for default AI model
 		const aiModel = await p.text({
 			message: "Default AI model?",
-			initialValue: "qwen/qwen3-235b-a22b-2507",
-			placeholder: "qwen/qwen3-235b-a22b-2507",
+			initialValue: "google/gemini-3-flash-preview",
+			placeholder: "google/gemini-3-flash-preview",
 		});
 
 		if (p.isCancel(aiModel)) {
@@ -358,7 +358,7 @@ export const initCommand: CommandDefinition = {
 		const config: Config = {
 			base_branch: baseBranch || "main",
 			worktrees_dir: worktreesDir || "../worktrees",
-			ai_model: aiModel || "qwen/qwen3-235b-a22b-2507",
+			ai_model: aiModel || "google/gemini-3-flash-preview",
 			open_terminal: openTerminal ?? true,
 			delete_remote_on_finish: deleteRemoteOnFinish ?? false,
 			ide: ideName,

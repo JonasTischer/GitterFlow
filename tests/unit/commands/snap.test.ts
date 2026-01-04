@@ -198,14 +198,14 @@ describe("snap command", () => {
 			const body = JSON.parse(fetchCalls[0]?.options.body as string) as {
 				model?: string;
 			};
-			expect(body.model).toBe("qwen/qwen3-235b-a22b-2507");
+			expect(body.model).toBe("google/gemini-3-flash-preview");
 		});
 
 		test("should use configured model from environment variable", async () => {
 			const { exec } = captureExec();
 			const { io } = commandIO();
 			process.env.OPENROUTER_API_KEY = "test-key";
-			process.env.GITTERFLOW_MODEL = "qwen/qwen3-235b-a22b-2507";
+			process.env.GITTERFLOW_MODEL = "google/gemini-3-flash-preview";
 
 			const exitCode = await snapCommand.run({
 				args: ["--no-confirm"],
@@ -219,7 +219,7 @@ describe("snap command", () => {
 				model?: string;
 				provider?: { sort?: string };
 			};
-			expect(body.model).toBe("qwen/qwen3-235b-a22b-2507");
+			expect(body.model).toBe("google/gemini-3-flash-preview");
 			// Qwen models should have provider config
 			expect(body.provider?.sort).toBe("throughput");
 		});
