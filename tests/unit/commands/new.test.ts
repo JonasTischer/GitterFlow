@@ -299,4 +299,79 @@ describe("new command", () => {
 			expect(stdoutMessages[2]).toContain("cd ");
 		});
 	});
+
+	describe("--task flag", () => {
+		test("should pass task to coding agent when --task flag is provided", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-x", "--task", "Implement shell completions"],
+				exec,
+				...io,
+			});
+
+			expect(stdoutMessages).toHaveLength(4);
+			// The agent command output should include the task
+			expect(stdoutMessages[3]).toContain("claude");
+			expect(stdoutMessages[3]).toContain("Implement shell completions");
+		});
+
+		test("should work with --task flag before branch name", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["--task", "Fix the bug", "fix-branch"],
+				exec,
+				...io,
+			});
+
+			expect(stdoutMessages[0]).toContain("fix-branch");
+			expect(stdoutMessages[3]).toContain("Fix the bug");
+		});
+
+		test("should generate random branch name when only --task is provided", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["--task", "Add new feature"],
+				exec,
+				...io,
+			});
+
+			// Should have created worktree with random name
+			expect(stdoutMessages[0]).toContain(
+				"Created worktree for branch worktree-",
+			);
+			expect(stdoutMessages[3]).toContain("Add new feature");
+		});
+
+		test("should handle task with special characters", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["test-branch", "--task", "Fix bug #123 & add tests"],
+				exec,
+				...io,
+			});
+
+			expect(stdoutMessages[3]).toContain("Fix bug #123 & add tests");
+		});
+
+		test("should handle multi-word task without quotes in args array", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["branch", "--task", "This is a long task description"],
+				exec,
+				...io,
+			});
+
+			expect(stdoutMessages[3]).toContain("This is a long task description");
+		});
+	});
 });

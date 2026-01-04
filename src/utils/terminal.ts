@@ -33,6 +33,9 @@ export function spawnTerminal(dir: string, agentCommand?: string): void {
 	const terminal = getSetting("terminal");
 	const codingAgent = agentCommand ?? getSetting("coding_agent");
 
+	// Escape double quotes for AppleScript (\" becomes \\\" in the shell command)
+	const escapedAgentCommand = codingAgent.replace(/"/g, '\\"');
+
 	if (os === "darwin") {
 		if (terminal === "iterm") {
 			// iTerm2 - create new tab, cd to directory, and run agent command
@@ -46,7 +49,7 @@ export function spawnTerminal(dir: string, agentCommand?: string): void {
 				"-e",
 				"tell current session of current tab",
 				"-e",
-				`write text "cd '${absolutePath}' && ${codingAgent}"`,
+				`write text "cd '${absolutePath}' && ${escapedAgentCommand}"`,
 				"-e",
 				"end tell",
 				"-e",
@@ -57,7 +60,7 @@ export function spawnTerminal(dir: string, agentCommand?: string): void {
 		} else {
 			// Terminal.app (default) - cd to directory and run agent command
 			const script = `tell application "Terminal"
-         do script "cd '${absolutePath}' && ${codingAgent}"
+         do script "cd '${absolutePath}' && ${escapedAgentCommand}"
          activate
        end tell`;
 			spawn("osascript", ["-e", script]);

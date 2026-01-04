@@ -1,9 +1,57 @@
 import { resolve } from "node:path";
 import { $ } from "bun";
 import { getSetting } from "../config";
+import { preTrustWorktree } from "../utils/claude-trust";
 import { createSymlinks } from "../utils/symlink";
 import { spawnTerminal } from "../utils/terminal";
 import type { CommandDefinition } from "./types";
+
+/**
+ * Parse --task flag from args
+ * Returns { branch: string | undefined, task: string | undefined }
+ */
+function parseArgs(args: string[]): { branch?: string; task?: string } {
+	let branch: string | undefined;
+	let task: string | undefined;
+
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i];
+		if (arg === "--task" || arg === "-t") {
+			// Next argument is the task
+			task = args[i + 1];
+			i++; // Skip the task value
+		} else if (!arg.startsWith("-")) {
+			// Non-flag argument is the branch name
+			if (!branch) {
+				branch = arg;
+			}
+		}
+	}
+
+	return { branch, task };
+}
+
+/**
+ * Build the agent command with optional task
+ * If task is provided, appends it as an initial prompt: claude "task"
+ */
+function buildAgentCommand(baseCommand: string, task?: string): string {
+	if (!task) {
+		return baseCommand;
+	}
+
+	// Escape double quotes in the task for shell safety
+	const escapedTask = task.replace(/"/g, '\\"');
+
+	// For claude, append the task as an initial prompt
+	// claude "Your task: ..." starts claude with that prompt
+	if (baseCommand === "claude" || baseCommand.startsWith("claude ")) {
+		return `claude "${escapedTask}"`;
+	}
+
+	// For other agents, just append the task
+	return `${baseCommand} "${escapedTask}"`;
+}
 
 /**
  * Generate a random branch name
@@ -44,10 +92,12 @@ function generateRandomBranchName(): string {
 
 export const newCommand: CommandDefinition = {
 	name: "new",
-	description: "Create a git worktree (optionally specify branch name)",
-	usage: "gitterflow new [branch]",
+	description:
+		"Create a git worktree (optionally specify branch name and task)",
+	usage: "gitterflow new [branch] [--task <prompt>]",
 	run: async ({ args, stderr, stdout, exec }) => {
-		const [branch] = args;
+		// Parse arguments for branch name and optional --task flag
+		const { branch, task } = parseArgs(args);
 
 		// Generate random branch name if none provided or if empty/whitespace
 		const trimmedBranch =
@@ -102,6 +152,15 @@ export const newCommand: CommandDefinition = {
 				);
 			}
 
+			// Pre-trust the worktree in Claude Code's config
+			// This prevents the "Do you trust this folder?" dialog when opening the worktree
+			try {
+				await preTrustWorktree(absoluteWorktreePath);
+			} catch {
+				// If pre-trusting fails (e.g., no Claude config), continue anyway
+				// User will just see the trust dialog once
+			}
+
 			// Output informative messages
 			stdout(`✅ Created worktree for branch ${trimmedBranch}`);
 			stdout(`📁 Switched to: ${absoluteWorktreePath}`);
@@ -113,7 +172,8 @@ export const newCommand: CommandDefinition = {
 
 			if (!skipTerminalSpawn) {
 				try {
-					const agentCommand = getSetting("coding_agent");
+					const baseAgentCommand = getSetting("coding_agent");
+					const agentCommand = buildAgentCommand(baseAgentCommand, task);
 					const ide = getSetting("ide");
 					const openTerminal = getSetting("open_terminal");
 
@@ -135,7 +195,8 @@ export const newCommand: CommandDefinition = {
 					}
 				} catch {
 					// If spawning fails, fall back to outputting commands
-					const agentCommand = getSetting("coding_agent");
+					const baseAgentCommand = getSetting("coding_agent");
+					const agentCommand = buildAgentCommand(baseAgentCommand, task);
 					stdout(`cd ${absoluteWorktreePath}`);
 					stdout(`${agentCommand}`);
 					stderr(
@@ -144,7 +205,8 @@ export const newCommand: CommandDefinition = {
 				}
 			} else {
 				// In test/CI environment, just output the commands
-				const agentCommand = getSetting("coding_agent");
+				const baseAgentCommand = getSetting("coding_agent");
+				const agentCommand = buildAgentCommand(baseAgentCommand, task);
 				stdout(`cd ${absoluteWorktreePath}`);
 				stdout(`${agentCommand}`);
 			}
