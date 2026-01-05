@@ -1,7 +1,12 @@
 import { resolve } from "node:path";
 import { $ } from "bun";
 import { getSetting } from "../config";
-import type { CommandDefinition, CommandExecutor } from "./types";
+import { readAgentState, updateAgentStatus } from "../utils/agent-state";
+import type {
+	CommandContext,
+	CommandDefinition,
+	CommandExecutor,
+} from "./types";
 
 /**
  * Get the configured OpenRouter model from environment variable or config file
@@ -154,12 +159,21 @@ async function getCurrentBranch(
 		branch = (await result.text()).trim();
 	} else {
 		const resolved = await result;
-		branch =
-			typeof resolved === "string"
-				? resolved.trim()
-				: resolved !== null && resolved !== undefined
-					? String(resolved).trim()
-					: "";
+		if (
+			typeof resolved === "object" &&
+			resolved !== null &&
+			"text" in resolved &&
+			typeof resolved.text === "function"
+		) {
+			branch = (await resolved.text()).trim();
+		} else {
+			branch =
+				typeof resolved === "string"
+					? resolved.trim()
+					: resolved !== null && resolved !== undefined
+						? String(resolved).trim()
+						: "";
+		}
 	}
 	return branch;
 }
@@ -187,12 +201,21 @@ async function detectBaseBranch(
 			storedBase = (await storedBaseResult.text()).trim();
 		} else {
 			const resolved = await storedBaseResult;
-			storedBase =
-				typeof resolved === "string"
-					? resolved.trim()
-					: resolved !== null && resolved !== undefined
-						? String(resolved).trim()
-						: "";
+			if (
+				typeof resolved === "object" &&
+				resolved !== null &&
+				"text" in resolved &&
+				typeof resolved.text === "function"
+			) {
+				storedBase = (await resolved.text()).trim();
+			} else {
+				storedBase =
+					typeof resolved === "string"
+						? resolved.trim()
+						: resolved !== null && resolved !== undefined
+							? String(resolved).trim()
+							: "";
+			}
 		}
 
 		// Verify the stored base branch still exists
@@ -418,17 +441,27 @@ function createDirExecutor(
 	};
 }
 
-export const finishCommand: CommandDefinition = {
+/**
+ * Extended context with optional rootDir for testing
+ */
+type FinishCommandContext = CommandContext & {
+	rootDir?: string;
+};
+
+export const finishCommand: CommandDefinition & {
+	run: (context: FinishCommandContext) => Promise<number>;
+} = {
 	name: "finish",
 	description: "Merge current branch into base branch and optionally clean up",
 	usage: "gitterflow finish",
-	run: async ({ stderr, stdout, exec }) => {
+	run: async ({ stderr, stdout, exec, rootDir }: FinishCommandContext) => {
 		const run = exec ?? $;
+		let currentBranch = "";
 
 		try {
 			// Step 1: Get current branch and worktree path (before checkout)
 			stdout("🔍 Detecting current branch...");
-			const currentBranch = await getCurrentBranch(run);
+			currentBranch = await getCurrentBranch(run);
 			stdout(`   Current branch: ${currentBranch}`);
 
 			// Store current directory (worktree path) before we checkout
@@ -578,6 +611,16 @@ export const finishCommand: CommandDefinition = {
 			try {
 				await mergeRun`git merge ${currentBranch} --no-edit`;
 				stdout(`✅ Successfully merged ${currentBranch} into ${baseBranch}`);
+
+				// Update agent state to merged (if exists)
+				try {
+					const agentState = await readAgentState(currentBranch, rootDir);
+					if (agentState) {
+						await updateAgentStatus(currentBranch, "merged", rootDir);
+					}
+				} catch {
+					// Ignore errors - agent state may not exist for non-autonomous worktrees
+				}
 			} catch (error) {
 				// Check if it's a merge conflict
 				const errorMessage =
@@ -586,6 +629,19 @@ export const finishCommand: CommandDefinition = {
 					errorMessage.includes("conflict") ||
 					errorMessage.includes("CONFLICT")
 				) {
+					// Update agent state to conflict (if exists)
+					try {
+						const agentState = await readAgentState(currentBranch, rootDir);
+						if (agentState) {
+							await updateAgentStatus(currentBranch, "conflict", rootDir, {
+								error:
+									"Merge conflict detected. Resolve conflicts and run gf finish again.",
+							});
+						}
+					} catch {
+						// Ignore errors
+					}
+
 					stderr(
 						`\n❌ Merge conflict detected — please resolve manually before continuing.`,
 					);
@@ -691,9 +747,24 @@ export const finishCommand: CommandDefinition = {
 
 			return 0;
 		} catch (error) {
-			stderr(
-				`❌ Failed to finish: ${error instanceof Error ? error.message : String(error)}`,
-			);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
+
+			// Update agent state to failed (if exists and branch is known)
+			if (currentBranch) {
+				try {
+					const agentState = await readAgentState(currentBranch, rootDir);
+					if (agentState) {
+						await updateAgentStatus(currentBranch, "failed", rootDir, {
+							error: errorMessage,
+						});
+					}
+				} catch {
+					// Ignore errors
+				}
+			}
+
+			stderr(`❌ Failed to finish: ${errorMessage}`);
 			return 1;
 		}
 	},

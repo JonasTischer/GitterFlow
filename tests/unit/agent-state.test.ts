@@ -53,10 +53,12 @@ describe("Agent State Utility", () => {
 				worktree_path: "/path/to/worktree",
 				base_branch: "main",
 				error: "Some error occurred",
+				message: "Working on authentication",
 			};
 
 			expect(state.completed_at).toBe("2024-01-01T01:00:00.000Z");
 			expect(state.error).toBe("Some error occurred");
+			expect(state.message).toBe("Working on authentication");
 		});
 
 		test("should support all valid status values", () => {
@@ -244,6 +246,23 @@ describe("Agent State Utility", () => {
 
 			expect(readState?.status).toBe("failed");
 			expect(readState?.error).toBe("Build failed with exit code 1");
+		});
+
+		test("should write and read message field", async () => {
+			const originalState: AgentState = {
+				branch: "feature-with-message",
+				task: "Task with status message",
+				status: "running",
+				started_at: "2024-01-15T10:00:00.000Z",
+				worktree_path: "/test",
+				base_branch: "main",
+				message: "Working on authentication middleware",
+			};
+
+			await writeAgentState(originalState, tempDir);
+			const readState = await readAgentState("feature-with-message", tempDir);
+
+			expect(readState?.message).toBe("Working on authentication middleware");
 		});
 	});
 
