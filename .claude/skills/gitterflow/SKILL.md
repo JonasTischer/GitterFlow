@@ -107,13 +107,13 @@ If a sub-agent completes but has merge conflicts:
 
 ## For Sub-Agents: Completing Your Task
 
-If you are a sub-agent spawned by GitterFlow, follow these steps when your task is complete:
+If you are a sub-agent spawned by GitterFlow, run `gf finish` when your task is complete. This command:
 
-1. **Commit your changes**: Use `gf snap` to commit with an AI-generated message, or `git commit -m "message"`
-2. **Finish and merge**: Run `gf finish` to merge your work back to the base branch
-3. **Verify success**: The finish command will handle the merge and cleanup
+1. **Auto-commits** any uncommitted changes with an AI-generated message
+2. **Merges** your branch back to the base branch
+3. **Cleans up** the worktree and branch
 
-**Important**: Always run `gf finish` when you complete your task. This merges your changes back to the parent branch and cleans up the worktree.
+**Important**: Just run `gf finish` - you don't need to commit first. The command handles everything.
 
 If `gf finish` fails due to merge conflicts:
 - Resolve the conflicts manually

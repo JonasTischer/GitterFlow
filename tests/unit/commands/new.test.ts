@@ -500,7 +500,7 @@ describe("new command", () => {
 			expect(state?.task).toBe("No task specified");
 		});
 
-		test("should append completion reminder to task prompt", async () => {
+		test("should append completion reminder via --append-system-prompt", async () => {
 			const { exec } = captureExec();
 			const { io, stdoutMessages } = commandIO();
 
@@ -511,10 +511,10 @@ describe("new command", () => {
 				rootDir: testDir,
 			});
 
-			// The task output should contain the completion reminder
+			// The command output should use --append-system-prompt with finish reminder
 			const taskOutput = stdoutMessages.find((msg) => msg.includes("claude"));
-			expect(taskOutput).toContain("gf snap");
-			expect(taskOutput).toContain("gf finish");
+			expect(taskOutput).toContain("--append-system-prompt");
+			expect(taskOutput).toContain("gitterflow skill");
 		});
 
 		test("should not write agent state without --autonomous flag", async () => {
@@ -544,8 +544,8 @@ describe("new command", () => {
 			});
 
 			const taskOutput = stdoutMessages.find((msg) => msg.includes("claude"));
-			expect(taskOutput).not.toContain("gf snap");
-			expect(taskOutput).not.toContain("gf finish");
+			expect(taskOutput).not.toContain("--append-system-prompt");
+			expect(taskOutput).not.toContain("gitterflow skill");
 		});
 	});
 });
