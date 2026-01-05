@@ -166,19 +166,28 @@ function parseArgs(args: string[]): {
 /**
  * Build the agent command with optional task
  * If task is provided, appends it as an initial prompt: claude "task"
+ * For Claude, adds --permission-mode acceptEdits to auto-accept edits
  */
 function buildAgentCommand(baseCommand: string, task?: string): string {
+	// For claude, add permission mode flag
+	const isClaude =
+		baseCommand === "claude" || baseCommand.startsWith("claude ");
+
 	if (!task) {
+		// No task - just add permission flag for claude
+		if (isClaude) {
+			return "claude --permission-mode acceptEdits";
+		}
 		return baseCommand;
 	}
 
 	// Escape double quotes in the task for shell safety
 	const escapedTask = task.replace(/"/g, '\\"');
 
-	// For claude, append the task as an initial prompt
-	// claude "Your task: ..." starts claude with that prompt
-	if (baseCommand === "claude" || baseCommand.startsWith("claude ")) {
-		return `claude "${escapedTask}"`;
+	// For claude, append the task as an initial prompt with permission mode
+	// claude --permission-mode acceptEdits "Your task: ..." starts claude with that prompt
+	if (isClaude) {
+		return `claude --permission-mode acceptEdits "${escapedTask}"`;
 	}
 
 	// For other agents, just append the task
