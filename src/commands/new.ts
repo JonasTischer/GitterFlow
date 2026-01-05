@@ -1,10 +1,11 @@
 import { resolve } from "node:path";
 import { $ } from "bun";
 import { getSetting } from "../config";
+import { writeAgentState } from "../utils/agent-state";
 import { preTrustWorktree } from "../utils/claude-trust";
 import { createSymlinks } from "../utils/symlink";
 import { spawnTerminal } from "../utils/terminal";
-import type { CommandDefinition } from "./types";
+import type { CommandContext, CommandDefinition } from "./types";
 
 // biome-ignore lint/suspicious/noExplicitAny: Shell runner type is complex
 type ShellRunner = any;
@@ -132,17 +133,20 @@ async function promptUncommittedChanges(
 
 /**
  * Parse command line arguments
- * Returns { branch, task, force }
+ * Returns { branch, task, force, autonomous }
  * --force or -f: auto-create WIP commit if uncommitted changes exist
+ * --autonomous or -a: track agent state for autonomous completion
  */
 function parseArgs(args: string[]): {
 	branch?: string;
 	task?: string;
 	force?: boolean;
+	autonomous?: boolean;
 } {
 	let branch: string | undefined;
 	let task: string | undefined;
 	let force = false;
+	let autonomous = false;
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i] ?? "";
@@ -152,6 +156,8 @@ function parseArgs(args: string[]): {
 			i++; // Skip the task value
 		} else if (arg === "--force" || arg === "-f") {
 			force = true;
+		} else if (arg === "--autonomous" || arg === "-a") {
+			autonomous = true;
 		} else if (!arg.startsWith("-")) {
 			// Non-flag argument is the branch name
 			if (!branch) {
@@ -160,8 +166,17 @@ function parseArgs(args: string[]): {
 		}
 	}
 
-	return { branch, task, force };
+	return { branch, task, force, autonomous };
 }
+
+/**
+ * Completion reminder appended to tasks when in autonomous mode
+ */
+const AUTONOMOUS_REMINDER = `
+
+---
+IMPORTANT: When you have completed this task, run \`gf snap\` to commit your
+changes, then run \`gf finish\` to merge your work back to the base branch.`;
 
 /**
  * Build the agent command with optional task
@@ -231,14 +246,23 @@ function generateRandomBranchName(): string {
 	return `worktree-${adjective}-${noun}-${randomNum}`;
 }
 
-export const newCommand: CommandDefinition = {
+/**
+ * Extended context with optional rootDir for testing
+ */
+type NewCommandContext = CommandContext & {
+	rootDir?: string;
+};
+
+export const newCommand: CommandDefinition & {
+	run: (context: NewCommandContext) => Promise<number>;
+} = {
 	name: "new",
 	description:
 		"Create a git worktree (optionally specify branch name and task)",
-	usage: "gitterflow new [branch] [--task <prompt>] [--force]",
-	run: async ({ args, stderr, stdout, exec }) => {
-		// Parse arguments for branch name, task, and force flag
-		const { branch, task, force } = parseArgs(args);
+	usage: "gitterflow new [branch] [--task <prompt>] [--force] [--autonomous]",
+	run: async ({ args, stderr, stdout, exec, rootDir }: NewCommandContext) => {
+		// Parse arguments for branch name, task, force flag, and autonomous flag
+		const { branch, task, force, autonomous } = parseArgs(args);
 		const run = exec ?? $;
 
 		// Check for uncommitted changes
@@ -334,6 +358,24 @@ export const newCommand: CommandDefinition = {
 				// User will just see the trust dialog once
 			}
 
+			// Write agent state for autonomous mode
+			if (autonomous) {
+				await writeAgentState(
+					{
+						branch: trimmedBranch,
+						task: task || "No task specified",
+						status: "running",
+						started_at: new Date().toISOString(),
+						worktree_path: absoluteWorktreePath,
+						base_branch: currentBranch,
+					},
+					rootDir,
+				);
+			}
+
+			// Prepare the final task with completion reminder for autonomous mode
+			const finalTask = autonomous && task ? task + AUTONOMOUS_REMINDER : task;
+
 			// Output informative messages
 			stdout(`✅ Created worktree for branch ${trimmedBranch}`);
 			stdout(`📁 Switched to: ${absoluteWorktreePath}`);
@@ -346,7 +388,7 @@ export const newCommand: CommandDefinition = {
 			if (!skipTerminalSpawn) {
 				try {
 					const baseAgentCommand = getSetting("coding_agent");
-					const agentCommand = buildAgentCommand(baseAgentCommand, task);
+					const agentCommand = buildAgentCommand(baseAgentCommand, finalTask);
 					const ide = getSetting("ide");
 					const openTerminal = getSetting("open_terminal");
 
@@ -369,7 +411,7 @@ export const newCommand: CommandDefinition = {
 				} catch {
 					// If spawning fails, fall back to outputting commands
 					const baseAgentCommand = getSetting("coding_agent");
-					const agentCommand = buildAgentCommand(baseAgentCommand, task);
+					const agentCommand = buildAgentCommand(baseAgentCommand, finalTask);
 					stdout(`cd ${absoluteWorktreePath}`);
 					stdout(`${agentCommand}`);
 					stderr(
@@ -379,7 +421,7 @@ export const newCommand: CommandDefinition = {
 			} else {
 				// In test/CI environment, just output the commands
 				const baseAgentCommand = getSetting("coding_agent");
-				const agentCommand = buildAgentCommand(baseAgentCommand, task);
+				const agentCommand = buildAgentCommand(baseAgentCommand, finalTask);
 				stdout(`cd ${absoluteWorktreePath}`);
 				stdout(`${agentCommand}`);
 			}

@@ -1,6 +1,15 @@
+import { $ } from "bun";
 import type { AgentState } from "../utils/agent-state";
-import { listAgentStates } from "../utils/agent-state";
-import type { CommandContext, CommandDefinition } from "./types";
+import {
+	listAgentStates,
+	readAgentState,
+	writeAgentState,
+} from "../utils/agent-state";
+import type {
+	CommandContext,
+	CommandDefinition,
+	CommandExecutor,
+} from "./types";
 
 /**
  * Status priority order for sorting agents
@@ -109,15 +118,102 @@ function formatAgentRow(agent: AgentState): string {
  */
 type StatusCommandContext = CommandContext & {
 	rootDir?: string;
+	exec?: CommandExecutor;
 };
+
+/**
+ * Get current branch name
+ */
+async function getCurrentBranch(
+	exec: CommandExecutor | typeof $,
+): Promise<string> {
+	const result = exec`git rev-parse --abbrev-ref HEAD`;
+	let branch: string;
+	if (
+		typeof result === "object" &&
+		result !== null &&
+		"text" in result &&
+		typeof result.text === "function"
+	) {
+		branch = (await result.text()).trim();
+	} else {
+		const resolved = await result;
+		if (
+			typeof resolved === "object" &&
+			resolved !== null &&
+			"text" in resolved &&
+			typeof resolved.text === "function"
+		) {
+			branch = (await resolved.text()).trim();
+		} else {
+			branch =
+				typeof resolved === "string"
+					? resolved.trim()
+					: resolved !== null && resolved !== undefined
+						? String(resolved).trim()
+						: "";
+		}
+	}
+	return branch;
+}
+
+/**
+ * Handle --write flag: update agent status message
+ */
+async function writeStatusMessage(
+	message: string,
+	context: StatusCommandContext,
+): Promise<number> {
+	const { stdout, stderr, rootDir, exec } = context;
+	const run = exec ?? $;
+
+	try {
+		const branch = await getCurrentBranch(run);
+		const state = await readAgentState(branch, rootDir);
+
+		if (!state) {
+			stderr(`No autonomous agent found for branch '${branch}'`);
+			return 1;
+		}
+
+		await writeAgentState(
+			{
+				...state,
+				message,
+			},
+			rootDir,
+		);
+
+		stdout(`Status updated for ${branch}`);
+		return 0;
+	} catch (error) {
+		stderr(
+			`Failed to update status: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return 1;
+	}
+}
 
 export const statusCommand: CommandDefinition & {
 	run: (context: StatusCommandContext) => Promise<number>;
 } = {
 	name: "status",
 	description: "Display status of all autonomous agents",
-	usage: "gitterflow status",
-	run: async ({ stdout, rootDir }: StatusCommandContext): Promise<number> => {
+	usage: "gitterflow status [--write <message>]",
+	run: async (context: StatusCommandContext): Promise<number> => {
+		const { args, stdout, stderr, rootDir } = context;
+
+		// Check for --write flag first
+		const writeIndex = args.findIndex((a) => a === "--write" || a === "-w");
+		if (writeIndex !== -1) {
+			const message = args[writeIndex + 1];
+			if (!message || message.startsWith("-")) {
+				stderr("Message required with --write flag");
+				return 1;
+			}
+			return writeStatusMessage(message, context);
+		}
+
 		const agents = await listAgentStates(rootDir);
 
 		if (agents.length === 0) {

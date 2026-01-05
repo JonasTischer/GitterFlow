@@ -1,5 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir, rm } from "node:fs/promises";
+import { join } from "node:path";
 import { newCommand } from "../../../src/commands/new";
+import { readAgentState } from "../../../src/utils/agent-state";
 import { captureExec, commandIO } from "../test-helpers";
 
 describe("new command", () => {
@@ -392,6 +395,157 @@ describe("new command", () => {
 			});
 
 			expect(stdoutMessages[3]).toContain("This is a long task description");
+		});
+	});
+
+	describe("--autonomous flag", () => {
+		const testDir = join(import.meta.dir, ".test-new-autonomous-tmp");
+
+		beforeEach(async () => {
+			await mkdir(testDir, { recursive: true });
+		});
+
+		afterEach(async () => {
+			await rm(testDir, { recursive: true, force: true });
+		});
+
+		test("should write initial agent state when --autonomous flag is provided", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			await newCommand.run({
+				args: [
+					"feature-autonomous",
+					"--autonomous",
+					"--task",
+					"Test autonomous task",
+				],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const state = await readAgentState("feature-autonomous", testDir);
+			expect(state).toBeDefined();
+			expect(state?.status).toBe("running");
+			expect(state?.task).toBe("Test autonomous task");
+			expect(state?.branch).toBe("feature-autonomous");
+			expect(state?.base_branch).toBe("main"); // From mock exec
+		});
+
+		test("should work with -a shorthand flag", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-shorthand", "-a", "--task", "Shorthand test"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const state = await readAgentState("feature-shorthand", testDir);
+			expect(state).toBeDefined();
+			expect(state?.status).toBe("running");
+		});
+
+		test("should set worktree_path in agent state", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-path", "--autonomous"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const state = await readAgentState("feature-path", testDir);
+			expect(state?.worktree_path).toBeDefined();
+			expect(state?.worktree_path).toContain("feature-path");
+		});
+
+		test("should set started_at timestamp in agent state", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			const beforeTime = new Date().toISOString();
+			await newCommand.run({
+				args: ["feature-timestamp", "--autonomous"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+			const afterTime = new Date().toISOString();
+
+			const state = await readAgentState("feature-timestamp", testDir);
+			expect(state?.started_at).toBeDefined();
+			// Check timestamp is within the time window
+			expect(state?.started_at >= beforeTime).toBe(true);
+			expect(state?.started_at <= afterTime).toBe(true);
+		});
+
+		test("should use 'No task specified' when no task provided with --autonomous", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-no-task", "--autonomous"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const state = await readAgentState("feature-no-task", testDir);
+			expect(state?.task).toBe("No task specified");
+		});
+
+		test("should append completion reminder to task prompt", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-reminder", "--autonomous", "--task", "Original task"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			// The task output should contain the completion reminder
+			const taskOutput = stdoutMessages.find((msg) => msg.includes("claude"));
+			expect(taskOutput).toContain("gf snap");
+			expect(taskOutput).toContain("gf finish");
+		});
+
+		test("should not write agent state without --autonomous flag", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-no-autonomous", "--task", "No autonomous"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const state = await readAgentState("feature-no-autonomous", testDir);
+			expect(state).toBeNull();
+		});
+
+		test("should not append completion reminder without --autonomous flag", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-no-reminder", "--task", "Simple task"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const taskOutput = stdoutMessages.find((msg) => msg.includes("claude"));
+			expect(taskOutput).not.toContain("gf snap");
+			expect(taskOutput).not.toContain("gf finish");
 		});
 	});
 });

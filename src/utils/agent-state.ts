@@ -33,6 +33,8 @@ export interface AgentState {
 	base_branch: string;
 	/** Error message if the task failed */
 	error?: string;
+	/** Status message from agent (set via gf status --write) */
+	message?: string;
 }
 
 /**

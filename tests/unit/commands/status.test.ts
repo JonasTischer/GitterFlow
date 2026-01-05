@@ -3,7 +3,10 @@ import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { statusCommand } from "../../../src/commands/status";
 import type { AgentState } from "../../../src/utils/agent-state";
-import { writeAgentState } from "../../../src/utils/agent-state";
+import {
+	readAgentState,
+	writeAgentState,
+} from "../../../src/utils/agent-state";
 import { commandIO } from "../test-helpers";
 
 describe("status command", () => {
@@ -292,6 +295,170 @@ describe("status command", () => {
 		test("should have usage information", () => {
 			expect(statusCommand.usage).toBeDefined();
 			expect(statusCommand.usage).toContain("gitterflow status");
+		});
+	});
+
+	describe("--write flag", () => {
+		// Helper to create exec that returns a specific branch name
+		const createMockExec = (branchName: string) => {
+			return async (strings: TemplateStringsArray) => {
+				const command = strings.join("");
+				if (command.includes("git rev-parse --abbrev-ref HEAD")) {
+					return {
+						text: async () => branchName,
+					};
+				}
+				return {};
+			};
+		};
+
+		test("should update agent message when --write flag is provided", async () => {
+			const { io, stdoutMessages } = commandIO();
+
+			// Setup: create initial agent state
+			const state: AgentState = {
+				branch: "feature-write-test",
+				task: "Test write flag",
+				status: "running",
+				started_at: new Date().toISOString(),
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+			await writeAgentState(state, testDir);
+
+			// Execute: run status --write with mock exec
+			const exitCode = await statusCommand.run({
+				args: ["--write", "Working on authentication"],
+				...io,
+				rootDir: testDir,
+				exec: createMockExec("feature-write-test"),
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stdoutMessages.join("\n")).toContain("Status updated");
+
+			// Verify: check updated state
+			const updatedState = await readAgentState("feature-write-test", testDir);
+			expect(updatedState?.message).toBe("Working on authentication");
+		});
+
+		test("should work with -w shorthand flag", async () => {
+			const { io, stdoutMessages } = commandIO();
+
+			const state: AgentState = {
+				branch: "feature-shorthand",
+				task: "Test shorthand",
+				status: "running",
+				started_at: new Date().toISOString(),
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+			await writeAgentState(state, testDir);
+
+			const exitCode = await statusCommand.run({
+				args: ["-w", "Running tests"],
+				...io,
+				rootDir: testDir,
+				exec: createMockExec("feature-shorthand"),
+			});
+
+			expect(exitCode).toBe(0);
+			expect(stdoutMessages.join("\n")).toContain("Status updated");
+
+			const updatedState = await readAgentState("feature-shorthand", testDir);
+			expect(updatedState?.message).toBe("Running tests");
+		});
+
+		test("should error when no message provided with --write", async () => {
+			const { io, stderrMessages } = commandIO();
+
+			const state: AgentState = {
+				branch: "feature-no-message",
+				task: "Test no message",
+				status: "running",
+				started_at: new Date().toISOString(),
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+			await writeAgentState(state, testDir);
+
+			const exitCode = await statusCommand.run({
+				args: ["--write"],
+				...io,
+				rootDir: testDir,
+				exec: createMockExec("feature-no-message"),
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stderrMessages.join("\n")).toContain("Message required");
+		});
+
+		test("should error when message starts with dash (likely another flag)", async () => {
+			const { io, stderrMessages } = commandIO();
+
+			const state: AgentState = {
+				branch: "feature-dash-message",
+				task: "Test dash message",
+				status: "running",
+				started_at: new Date().toISOString(),
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+			await writeAgentState(state, testDir);
+
+			const exitCode = await statusCommand.run({
+				args: ["--write", "--verbose"],
+				...io,
+				rootDir: testDir,
+				exec: createMockExec("feature-dash-message"),
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stderrMessages.join("\n")).toContain("Message required");
+		});
+
+		test("should error when no agent state exists for current branch", async () => {
+			const { io, stderrMessages } = commandIO();
+
+			// No agent state created - should error
+			const exitCode = await statusCommand.run({
+				args: ["--write", "Some message"],
+				...io,
+				rootDir: testDir,
+				exec: createMockExec("non-existent-branch"),
+			});
+
+			expect(exitCode).toBe(1);
+			expect(stderrMessages.join("\n")).toContain("No autonomous agent found");
+		});
+
+		test("should preserve other agent state fields when updating message", async () => {
+			const { io } = commandIO();
+
+			const originalState: AgentState = {
+				branch: "feature-preserve",
+				task: "Test preserve fields",
+				status: "running",
+				started_at: "2024-01-15T10:30:00.000Z",
+				worktree_path: "/specific/path",
+				base_branch: "develop",
+			};
+			await writeAgentState(originalState, testDir);
+
+			await statusCommand.run({
+				args: ["--write", "New message"],
+				...io,
+				rootDir: testDir,
+				exec: createMockExec("feature-preserve"),
+			});
+
+			const updatedState = await readAgentState("feature-preserve", testDir);
+			expect(updatedState?.message).toBe("New message");
+			expect(updatedState?.task).toBe("Test preserve fields");
+			expect(updatedState?.status).toBe("running");
+			expect(updatedState?.started_at).toBe("2024-01-15T10:30:00.000Z");
+			expect(updatedState?.worktree_path).toBe("/specific/path");
+			expect(updatedState?.base_branch).toBe("develop");
 		});
 	});
 });
