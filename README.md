@@ -1,9 +1,44 @@
-THIS IS A TEST23!!!
 # GitterFlow CLI
 
-> A fast, ergonomic CLI for managing parallel AI coding workflows with Git worktrees
+> **Orchestrate Claude Code agents with Git worktrees**
 
-GitterFlow (`gf`) enables developers to run multiple AI coding agents in parallel using Git worktrees. Each worktree provides an isolated environment where an agent (like Claude Code or Cursor) can work on a specific feature independently.
+GitterFlow (`gf`) is a CLI utility that enables orchestration of AI coding agents using Git worktrees for isolation. Run multiple Claude Code instances in parallel, each working on independent tasks in their own worktree.
+
+## Vision
+
+GitterFlow evolves in two phases:
+
+### Phase 1: Human Developer Tools ✅
+Give developers ergonomic tools to manage parallel AI coding workflows:
+- Create worktrees with one command
+- Auto-open terminal/IDE with your coding agent
+- AI-generated commit messages
+- Smart merge workflows
+
+### Phase 2: Agent Orchestration 🚧
+Enable Claude Code agents to spawn and coordinate sub-agents autonomously:
+- Brain agent spawns sub-agents for parallel tasks
+- Sub-agents work independently in isolated worktrees
+- Automatic merge back when complete
+- Status tracking and notifications
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    BRAIN AGENT (Orchestrator)                │
+│                                                              │
+│  gf new --task "Add feature X" --autonomous                 │
+│  gf new --task "Fix bug Y" --autonomous                     │
+│  gf status                                                   │
+└─────────────────────────────────────────────────────────────┘
+         │                    │
+         ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐
+│   SUB-AGENT 1   │  │   SUB-AGENT 2   │
+│   Worktree A    │  │   Worktree B    │
+│   Feature X     │  │   Bug Fix Y     │
+│   → gf finish   │  │   → gf finish   │
+└─────────────────┘  └─────────────────┘
+```
 
 ## Quick Start
 
@@ -21,26 +56,39 @@ bun link
 
 ```bash
 # Initialize configuration (interactive setup wizard)
-gitterflow init
+gf init
 
-# Create a new worktree (with optional branch name)
-# Automatically opens terminal/IDE in the worktree directory
-gitterflow new [branch-name]
+# Create a new worktree (opens terminal/IDE automatically)
+gf new [branch-name]
+
+# Create worktree with initial task for Claude Code
+gf new --task "Implement user authentication"
+
+# Create worktree for autonomous agent (Phase 2 - coming soon)
+gf new --task "Add retry logic" --autonomous
 
 # List active worktrees (interactive selector)
-gitterflow list
+gf list
 
 # Delete a worktree
-gitterflow delete [branch-name]
+gf delete [branch-name]
 
-# Automatically commit changes with AI-generated commit message
-gitterflow snap [--no-confirm]
+# Commit with AI-generated message
+gf snap
 
-# Finish work: merge branch, push, and clean up
-gitterflow finish
+# Merge branch back and clean up
+gf finish
 ```
 
-**Note:** The `new` command automatically opens a new terminal window/tab or IDE in the created worktree directory (configurable).
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Auto-open terminal/IDE** | New worktrees open with your coding agent ready |
+| **`--task` flag** | Pass initial prompt to Claude Code |
+| **Pre-trust worktrees** | No "trust this folder?" dialogs |
+| **AI commits** | Generate commit messages with OpenRouter |
+| **Smart merge** | Detects base branch, handles conflicts |
 
 ### Configuration
 
@@ -153,13 +201,22 @@ Interactive setup wizard that creates `.gitterflow.yaml` configuration file.
 - Prompts for base branch, worktrees directory, AI model, terminal/IDE preferences
 - Optionally creates shell alias (e.g., `gf` for `gitterflow`)
 
-### `gitterflow new [branch-name]`
+### `gitterflow new [branch-name] [--task <prompt>]`
 
 Creates a new git worktree with an optional branch name. If no branch name is provided, generates a random name.
 
 - Creates worktree in parent directory (e.g., `../branch-name`)
+- Pre-trusts the worktree in Claude Code (no trust dialog)
 - Opens terminal/IDE in the worktree directory
 - Runs configured coding agent automatically
+
+**Options:**
+- `--task <prompt>` or `-t <prompt>` - Pass initial prompt to Claude Code
+  ```bash
+  gf new --task "Implement shell completions for bash/zsh/fish"
+  gf new feature-auth --task "Add OAuth2 authentication"
+  ```
+- `--autonomous` - (Coming soon) Run agent autonomously, auto-merge when done
 
 ### `gitterflow list`
 
@@ -232,7 +289,7 @@ This project follows **Test-Driven Development (TDD)** practices.
 
 ```bash
 # Run unit tests only (fast - for development)
-bun run test
+bun test
 # or
 bun run test:unit
 
@@ -289,28 +346,29 @@ See [CLAUDE.md](./CLAUDE.md) for detailed TDD guidelines and testing patterns.
 ```
 GitterFlow/
 ├── src/
-│   ├── index.ts              # CLI entry point (shebang)
-│   ├── cli.ts                # Command dispatcher and shared CLI wiring
+│   ├── index.ts              # CLI entry point
+│   ├── cli.ts                # Command dispatcher
 │   ├── config.ts             # Configuration loader
 │   ├── commands/             # Command implementations
-│   │   ├── delete.ts
-│   │   ├── finish.ts
-│   │   ├── help.ts
-│   │   ├── init.ts
-│   │   ├── list.ts
-│   │   ├── new.ts
-│   │   ├── snap.ts
-│   │   ├── index.ts
-│   │   └── types.ts
-│   └── utils/                # Shared utilities
-│       ├── terminal.ts       # Terminal spawning
-│       └── ide.ts            # IDE opening
+│   │   ├── new.ts            # Worktree creation + --task flag
+│   │   ├── finish.ts         # Merge workflow
+│   │   ├── snap.ts           # AI commits
+│   │   ├── list.ts           # List worktrees
+│   │   ├── delete.ts         # Remove worktrees
+│   │   ├── init.ts           # Setup wizard
+│   │   └── help.ts           # Help command
+│   └── utils/
+│       ├── terminal.ts       # Terminal spawning (macOS/Linux/Windows)
+│       ├── ide.ts            # IDE opening (Cursor/VS Code)
+│       ├── claude-trust.ts   # Pre-trust worktrees in Claude Code
+│       ├── symlink.ts        # Symlink creation
+│       └── scanner.ts        # Symlink candidate detection
 ├── tests/
-│   ├── unit/                 # Unit tests
-│   └── integration/          # Integration tests
-├── .github/workflows/        # CI/CD workflows
-├── bunfig.toml              # Bun configuration
-└── gitterflow-cli-spec.md   # Detailed specification
+│   ├── unit/                 # Fast unit tests (mocked)
+│   └── integration/          # Real git operations
+├── docs/
+│   └── ARCHITECTURE.md       # Technical architecture & Phase 2 design
+└── .gitterflow.yaml          # Project configuration
 ```
 
 ## CI/CD
@@ -328,33 +386,32 @@ GitHub Actions automatically:
 
 ## Roadmap
 
-### Phase 0: Foundation ✅
-- [x] Basic CLI structure with help command
-- [x] Test setup with TDD workflow
-- [x] CI/CD pipeline
-- [x] Config loader for `.gitterflow.yaml`
-- [ ] Metadata storage system
-- [ ] Port allocation utility
-
-### Phase 1: Core Commands ✅
-- [x] `gitterflow init` - Interactive configuration setup
-- [x] `gitterflow new` - Worktree creation with terminal/IDE support
-- [x] `gitterflow list` - Interactive worktree listing
-- [x] `gitterflow delete` - Worktree removal
-- [x] `gitterflow snap` - AI-generated commit messages
-- [x] `gitterflow finish` - Merge workflow and cleanup
-
-### Phase 2: Enhancements
+### Phase 1: Human Developer Tools ✅
+- [x] `gf init` - Interactive configuration setup
+- [x] `gf new` - Worktree creation with terminal/IDE support
+- [x] `gf new --task` - Pass initial prompt to Claude Code
+- [x] `gf list` - Interactive worktree listing
+- [x] `gf delete` - Worktree removal
+- [x] `gf snap` - AI-generated commit messages
+- [x] `gf finish` - Merge workflow and cleanup
+- [x] Pre-trust worktrees in Claude Code config
 - [x] IDE support (Cursor, VS Code)
-- [x] Interactive commit message editing
 - [x] Shell alias creation
-- [ ] Fast-forward merge validation
-- [ ] Error handling and recovery improvements
 
-### Phase 3: Polish
-- [x] Comprehensive test coverage
-- [ ] Window mode support
+### Phase 2: Agent Orchestration 🚧
+- [ ] `--autonomous` flag - Sub-agents auto-finish when done
+- [ ] `gf status` - Check status of running agents
+- [ ] Agent state tracking in `.gitterflow/agents/`
+- [ ] `gf mark-failed` - Mark failed agents
+- [ ] `gf notify-complete` - Hook integration for notifications
+- [x] GitterFlow skill for Claude Code (`.claude/skills/gitterflow/SKILL.md`)
+- [ ] Hooks setup in `gf init`
+
+### Phase 3: Advanced Features
+- [ ] `--pr` flag - Create PR instead of direct merge
+- [ ] `gf cancel` - Kill running autonomous agents
 - [ ] Shell completion scripts
+- [ ] Port allocation for multi-service worktrees
 
 ## Requirements
 

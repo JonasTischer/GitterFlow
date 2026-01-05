@@ -32,6 +32,19 @@ const captureExec = () => {
 		// Return mock result that supports .text() for various git commands
 		const command = strings.join("");
 
+		// Mock git status to return empty (no uncommitted changes) by default
+		if (command.includes("git status --porcelain")) {
+			const mockResult: { text: () => Promise<string> } = {
+				text: async () => "",
+			};
+			return Object.assign(
+				Promise.resolve(mockResult),
+				mockResult,
+			) as unknown as Promise<{ text: () => Promise<string> }> & {
+				text: () => Promise<string>;
+			};
+		}
+
 		if (command.includes("git diff --cached")) {
 			const mockResult: { text: () => Promise<string> } = {
 				text: async () => "diff --git a/test.txt b/test.txt\n+new content",

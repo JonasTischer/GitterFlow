@@ -3,7 +3,6 @@ worktrees_dir: ../worktrees
 ai_model: google/gemini-3-flash-preview
 open_terminal: true
 delete_remote_on_finish: true
-ide: cursor
 symlink_files:
   - .env.local
   - node_modules

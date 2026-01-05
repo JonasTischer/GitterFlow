@@ -21,10 +21,10 @@ describe("new command", () => {
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
 
-			// Should have made 3 git calls: rev-parse, worktree add, config
-			expect(calls).toHaveLength(3);
-			expect(calls[1]?.strings.join("")).toContain("git worktree add");
-			expect(calls[1]?.values).toHaveLength(2); // branch name and path
+			// Should have made 4 git calls: status, rev-parse, worktree add, config
+			expect(calls).toHaveLength(4);
+			expect(calls[2]?.strings.join("")).toContain("git worktree add");
+			expect(calls[2]?.values).toHaveLength(2); // branch name and path
 		});
 
 		test("should use empty string args as no branch name", async () => {
@@ -39,8 +39,8 @@ describe("new command", () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdoutMessages).toHaveLength(4);
-			// Should have made 3 git calls: rev-parse, worktree add, config
-			expect(calls).toHaveLength(3);
+			// Should have made 4 git calls: status, rev-parse, worktree add, config
+			expect(calls).toHaveLength(4);
 		});
 
 		test("should use whitespace-only args as no branch name", async () => {
@@ -55,8 +55,8 @@ describe("new command", () => {
 
 			expect(exitCode).toBe(0);
 			expect(stdoutMessages).toHaveLength(4);
-			// Should have made 3 git calls: rev-parse, worktree add, config
-			expect(calls).toHaveLength(3);
+			// Should have made 4 git calls: status, rev-parse, worktree add, config
+			expect(calls).toHaveLength(4);
 		});
 
 		test("should generate different names on multiple calls", async () => {
@@ -72,8 +72,8 @@ describe("new command", () => {
 					...io,
 				});
 
-				// Second call is the git worktree add command
-				const branchName = calls[1]?.values[0] as string;
+				// Third call is the git worktree add command (after status and rev-parse)
+				const branchName = calls[2]?.values[0] as string;
 				names.add(branchName);
 			}
 
@@ -104,11 +104,11 @@ describe("new command", () => {
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
 
-			// Should have made 3 git calls: rev-parse, worktree add, config
-			expect(calls).toHaveLength(3);
-			expect(calls[1]?.strings.join("")).toContain("git worktree add");
-			expect(calls[1]?.strings.join("")).toContain("-b");
-			expect(calls[1]?.values).toContain("feature/new-feature");
+			// Should have made 4 git calls: status, rev-parse, worktree add, config
+			expect(calls).toHaveLength(4);
+			expect(calls[2]?.strings.join("")).toContain("git worktree add");
+			expect(calls[2]?.strings.join("")).toContain("-b");
+			expect(calls[2]?.values).toContain("feature/new-feature");
 		});
 
 		test("should use correct worktree path in parent directory", async () => {
@@ -121,9 +121,9 @@ describe("new command", () => {
 				...io,
 			});
 
-			// Path should be ../my-branch (second call is git worktree add)
-			const commandStr = calls[1]?.strings.join("{{VALUE}}") ?? "";
-			const fullCommand = calls[1]?.values.reduce(
+			// Path should be ../my-branch (third call is git worktree add, after status and rev-parse)
+			const commandStr = calls[2]?.strings.join("{{VALUE}}") ?? "";
+			const fullCommand = calls[2]?.values.reduce(
 				(cmd: string, val: unknown, _idx: number) =>
 					cmd.replace("{{VALUE}}", String(val)),
 				commandStr,
@@ -146,8 +146,8 @@ describe("new command", () => {
 			expect(stdoutMessages[1]).toContain("Switched to");
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
-			// Second call is git worktree add
-			expect(calls[1]?.values).toContain("feature/authentication");
+			// Third call is git worktree add (after status and rev-parse)
+			expect(calls[2]?.values).toContain("feature/authentication");
 		});
 
 		test("should handle branch names with hyphens", async () => {
@@ -160,18 +160,43 @@ describe("new command", () => {
 				...io,
 			});
 
-			// Second call is git worktree add
-			expect(calls[1]?.values).toContain("fix-bug-123");
+			// Third call is git worktree add (after status and rev-parse)
+			expect(calls[2]?.values).toContain("fix-bug-123");
 		});
 	});
 
 	describe("error handling", () => {
+		// Helper to create an exec that succeeds for status but fails for other commands
+		const createFailingExec = (
+			errorMessage: string,
+			shellError?: { exitCode?: number; stderr?: string },
+		) => {
+			return async (strings: TemplateStringsArray) => {
+				const command = strings.join("");
+
+				// First call is git status - return empty (no uncommitted changes)
+				if (command.includes("git status --porcelain")) {
+					return {
+						text: async () => "",
+					};
+				}
+
+				// All other calls fail
+				const error = new Error(errorMessage);
+				if (shellError?.exitCode) {
+					(error as unknown as { exitCode: number }).exitCode =
+						shellError.exitCode;
+				}
+				if (shellError?.stderr) {
+					(error as unknown as { stderr: string }).stderr = shellError.stderr;
+				}
+				throw error;
+			};
+		};
+
 		test("should return error code when git command fails", async () => {
 			const { io, stderrMessages } = commandIO();
-
-			const failingExec = async () => {
-				throw new Error("git worktree add failed");
-			};
+			const failingExec = createFailingExec("git worktree add failed");
 
 			const exitCode = await newCommand.run({
 				args: ["test-branch"],
@@ -186,14 +211,10 @@ describe("new command", () => {
 
 		test("should handle ShellError with exit code", async () => {
 			const { io, stderrMessages } = commandIO();
-
-			const failingExec = async () => {
-				const error = new Error("fatal: invalid reference: test");
-				(error as unknown as { exitCode: number }).exitCode = 128;
-				(error as unknown as { stderr: string }).stderr =
-					"fatal: invalid reference: test\n";
-				throw error;
-			};
+			const failingExec = createFailingExec("fatal: invalid reference: test", {
+				exitCode: 128,
+				stderr: "fatal: invalid reference: test\n",
+			});
 
 			const exitCode = await newCommand.run({
 				args: ["test-branch"],
@@ -207,10 +228,9 @@ describe("new command", () => {
 
 		test("should show helpful error message on git failure", async () => {
 			const { io, stderrMessages } = commandIO();
-
-			const failingExec = async () => {
-				throw new Error("worktree '../test' already exists");
-			};
+			const failingExec = createFailingExec(
+				"worktree '../test' already exists",
+			);
 
 			await newCommand.run({
 				args: ["test"],
@@ -237,9 +257,9 @@ describe("new command", () => {
 
 			// The worktree should be created from HEAD (current branch)
 			// git worktree add -b feature-x ../feature-x
-			expect(calls).toHaveLength(3);
-			// Second call is git worktree add
-			const cmd = calls[1]?.strings.join("").trim() ?? "";
+			expect(calls).toHaveLength(4);
+			// Third call is git worktree add (after status and rev-parse)
+			const cmd = calls[2]?.strings.join("").trim() ?? "";
 			expect(cmd).toContain("git worktree add");
 			expect(cmd).toContain("-b");
 		});
@@ -260,8 +280,8 @@ describe("new command", () => {
 			expect(stdoutMessages[1]).toContain("Switched to");
 			expect(stdoutMessages[2]).toContain("cd ");
 			expect(stdoutMessages[3]).toContain("claude");
-			// Second call is git worktree add
-			expect(calls[1]?.values).toContain("my-branch");
+			// Third call is git worktree add (after status and rev-parse)
+			expect(calls[2]?.values).toContain("my-branch");
 		});
 	});
 

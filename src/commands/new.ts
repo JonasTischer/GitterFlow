@@ -6,20 +6,152 @@ import { createSymlinks } from "../utils/symlink";
 import { spawnTerminal } from "../utils/terminal";
 import type { CommandDefinition } from "./types";
 
+// biome-ignore lint/suspicious/noExplicitAny: Shell runner type is complex
+type ShellRunner = any;
+
 /**
- * Parse --task flag from args
- * Returns { branch: string | undefined, task: string | undefined }
+ * Check for uncommitted changes in the working directory
+ * Returns the git status output if there are changes
  */
-function parseArgs(args: string[]): { branch?: string; task?: string } {
+async function getUncommittedChanges(run: ShellRunner): Promise<string | null> {
+	const statusResult = run`git status --porcelain`;
+
+	let status: string;
+	if (
+		typeof statusResult === "object" &&
+		statusResult !== null &&
+		"text" in statusResult &&
+		typeof statusResult.text === "function"
+	) {
+		status = await statusResult.text();
+	} else {
+		const resolved = await statusResult;
+		status =
+			typeof resolved === "string"
+				? resolved
+				: typeof resolved === "object" &&
+						resolved !== null &&
+						"text" in resolved &&
+						typeof resolved.text === "function"
+					? await resolved.text()
+					: String(resolved);
+	}
+
+	const trimmed = status.trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * Create a WIP commit with all uncommitted changes
+ */
+async function createWipCommit(
+	stdout: (msg: string) => void,
+	run: ShellRunner,
+): Promise<void> {
+	await run`git add -A`;
+	const message = "wip: checkpoint before worktree creation";
+	await run`git commit -m ${message}`;
+	stdout(`📦 Created WIP commit: "${message}"`);
+}
+
+/**
+ * Prompt user for how to handle uncommitted changes
+ * Returns: 'commit' | 'ignore' | 'cancel'
+ */
+async function promptUncommittedChanges(
+	changes: string,
+	stdout: (msg: string) => void,
+): Promise<"commit" | "ignore" | "cancel"> {
+	stdout(
+		"\n⚠️  You have uncommitted changes that won't be in the new worktree:",
+	);
+	// Show first 10 lines of changes
+	const lines = changes.split("\n").slice(0, 10);
+	for (const line of lines) {
+		stdout(`   ${line}`);
+	}
+	if (changes.split("\n").length > 10) {
+		stdout(`   ... and ${changes.split("\n").length - 10} more files`);
+	}
+	stdout("");
+	stdout("  Options:");
+	stdout("  • [c] Create WIP commit and continue");
+	stdout("  • [i] Ignore and continue (changes won't be in worktree)");
+	stdout("  • [n] Cancel");
+	stdout("");
+
+	// Set stdin to raw mode to capture single key presses
+	const wasRaw = process.stdin.isRaw;
+	if (!wasRaw && process.stdin.setRawMode) {
+		process.stdin.setRawMode(true);
+	}
+	process.stdin.resume();
+	process.stdin.setEncoding("utf8");
+
+	return new Promise((resolve) => {
+		const onData = (key: string) => {
+			// Handle Ctrl+C
+			if (key === "\u0003") {
+				if (process.stdin.setRawMode) {
+					process.stdin.setRawMode(wasRaw);
+				}
+				process.stdin.pause();
+				process.stdin.removeListener("data", onData);
+				resolve("cancel");
+				return;
+			}
+
+			const lowerKey = key.toLowerCase().trim();
+
+			// Restore stdin
+			if (process.stdin.setRawMode) {
+				process.stdin.setRawMode(wasRaw);
+			}
+			process.stdin.pause();
+			process.stdin.removeListener("data", onData);
+
+			if (lowerKey === "c") {
+				stdout("  → Creating WIP commit\n");
+				resolve("commit");
+			} else if (lowerKey === "i") {
+				stdout("  → Continuing without uncommitted changes\n");
+				resolve("ignore");
+			} else if (lowerKey === "n" || lowerKey === "\u001b") {
+				stdout("  → Cancelled\n");
+				resolve("cancel");
+			} else {
+				// Invalid key, default to cancel for safety
+				stdout(`  → Invalid key '${key}', cancelling\n`);
+				resolve("cancel");
+			}
+		};
+
+		process.stdin.once("data", onData);
+	});
+}
+
+/**
+ * Parse command line arguments
+ * Returns { branch, task, force }
+ * --force or -f: auto-create WIP commit if uncommitted changes exist
+ */
+function parseArgs(args: string[]): {
+	branch?: string;
+	task?: string;
+	force?: boolean;
+} {
 	let branch: string | undefined;
 	let task: string | undefined;
+	let force = false;
 
 	for (let i = 0; i < args.length; i++) {
-		const arg = args[i];
+		const arg = args[i] ?? "";
 		if (arg === "--task" || arg === "-t") {
 			// Next argument is the task
 			task = args[i + 1];
 			i++; // Skip the task value
+		} else if (arg === "--force" || arg === "-f") {
+			force = true;
 		} else if (!arg.startsWith("-")) {
 			// Non-flag argument is the branch name
 			if (!branch) {
@@ -28,7 +160,7 @@ function parseArgs(args: string[]): { branch?: string; task?: string } {
 		}
 	}
 
-	return { branch, task };
+	return { branch, task, force };
 }
 
 /**
@@ -94,10 +226,43 @@ export const newCommand: CommandDefinition = {
 	name: "new",
 	description:
 		"Create a git worktree (optionally specify branch name and task)",
-	usage: "gitterflow new [branch] [--task <prompt>]",
+	usage: "gitterflow new [branch] [--task <prompt>] [--force]",
 	run: async ({ args, stderr, stdout, exec }) => {
-		// Parse arguments for branch name and optional --task flag
-		const { branch, task } = parseArgs(args);
+		// Parse arguments for branch name, task, and force flag
+		const { branch, task, force } = parseArgs(args);
+		const run = exec ?? $;
+
+		// Check for uncommitted changes
+		const uncommittedChanges = await getUncommittedChanges(run);
+		if (uncommittedChanges) {
+			// Skip interactive prompt in CI/test environments
+			const isNonInteractive =
+				process.env.CI === "true" || process.env.NODE_ENV === "test";
+
+			if (force) {
+				// --force flag: auto-create WIP commit
+				await createWipCommit(stdout, run);
+			} else if (isNonInteractive) {
+				// Non-interactive: just warn and continue
+				stdout(
+					"⚠️  Uncommitted changes detected (continuing without them in non-interactive mode)",
+				);
+			} else {
+				// Interactive: prompt user
+				const choice = await promptUncommittedChanges(
+					uncommittedChanges,
+					stdout,
+				);
+				if (choice === "cancel") {
+					stdout("Cancelled.");
+					return 0;
+				}
+				if (choice === "commit") {
+					await createWipCommit(stdout, run);
+				}
+				// choice === 'ignore': continue without committing
+			}
+		}
 
 		// Generate random branch name if none provided or if empty/whitespace
 		const trimmedBranch =
@@ -107,7 +272,6 @@ export const newCommand: CommandDefinition = {
 
 		try {
 			// Get the current branch (this will be the base branch for the new worktree)
-			const run = exec ?? $;
 			const currentBranchResult = run`git rev-parse --abbrev-ref HEAD`;
 
 			// First await the result to handle Promises
