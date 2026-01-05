@@ -314,6 +314,96 @@ async function branchExists(
 }
 
 /**
+ * Check if a directory has uncommitted changes using git status --porcelain
+ */
+async function hasUncommittedChanges(
+	run: CommandExecutor | typeof $,
+): Promise<boolean> {
+	try {
+		const result = run`git status --porcelain`;
+		let status: string;
+		if (
+			typeof result === "object" &&
+			result !== null &&
+			"text" in result &&
+			typeof result.text === "function"
+		) {
+			status = (await result.text()).trim();
+		} else {
+			const resolved = await result;
+			if (
+				typeof resolved === "object" &&
+				resolved !== null &&
+				"text" in resolved &&
+				typeof resolved.text === "function"
+			) {
+				status = (await resolved.text()).trim();
+			} else {
+				status =
+					typeof resolved === "string"
+						? resolved.trim()
+						: resolved !== null && resolved !== undefined
+							? String(resolved).trim()
+							: "";
+			}
+		}
+		return status.length > 0;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Stash uncommitted changes with a descriptive message
+ * Returns true if changes were stashed, false otherwise
+ */
+async function stashChanges(
+	run: CommandExecutor | typeof $,
+	branchName: string,
+	stdout: (msg: string) => void,
+): Promise<boolean> {
+	try {
+		const hasChanges = await hasUncommittedChanges(run);
+		if (!hasChanges) {
+			return false;
+		}
+
+		stdout(`📦 Stashing uncommitted changes before merge...`);
+		const stashMessage = `gf-finish: auto-stashed before merge from ${branchName}`;
+		await run`git stash push -m ${stashMessage}`;
+		stdout(`   Stashed changes with message: "${stashMessage}"`);
+		return true;
+	} catch (error) {
+		// If stash fails, we continue anyway - the merge might still work
+		stdout(
+			`   Note: Could not stash changes: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		return false;
+	}
+}
+
+/**
+ * Pop stashed changes, with warning on failure
+ */
+async function popStashedChanges(
+	run: CommandExecutor | typeof $,
+	stdout: (msg: string) => void,
+	stderr: (msg: string) => void,
+): Promise<void> {
+	try {
+		await run`git stash pop`;
+		stdout(`📦 Restored stashed changes.`);
+	} catch (error) {
+		stderr(
+			`⚠️  Warning: Could not restore stashed changes. Run 'git stash pop' manually to recover.`,
+		);
+		stderr(
+			`   Error: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
+}
+
+/**
  * Get the main repository directory (where .git is located)
  * Works from both main repo and worktrees
  */
@@ -576,6 +666,12 @@ export const finishCommand: CommandDefinition & {
 			// Use main repo executor if we're merging from main repo, otherwise use regular executor
 			const mergeRun = mainRepoRun ?? run;
 
+			// Step 5.5: Auto-stash uncommitted changes in base branch directory before merge
+			let didStash = false;
+			if (baseBranchCheckedOut) {
+				didStash = await stashChanges(mergeRun, currentBranch, stdout);
+			}
+
 			// Step 6: Pull latest changes for base branch
 			if (baseBranchCheckedOut) {
 				stdout(`📥 Pulling latest changes for ${baseBranch}...`);
@@ -611,6 +707,11 @@ export const finishCommand: CommandDefinition & {
 			try {
 				await mergeRun`git merge ${currentBranch} --no-edit`;
 				stdout(`✅ Successfully merged ${currentBranch} into ${baseBranch}`);
+
+				// Step 7.5: Auto-pop stashed changes after successful merge
+				if (didStash) {
+					await popStashedChanges(mergeRun, stdout, stderr);
+				}
 
 				// Update agent state to merged (if exists)
 				try {
