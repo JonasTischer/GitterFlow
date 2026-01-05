@@ -11,6 +11,13 @@ import type { CommandContext, CommandDefinition } from "./types";
 type ShellRunner = any;
 
 /**
+ * Extended context with optional rootDir for testing
+ */
+type NewCommandContext = CommandContext & {
+	rootDir?: string;
+};
+
+/**
  * Check for uncommitted changes in the working directory
  * Returns the git status output if there are changes
  */
@@ -135,7 +142,7 @@ async function promptUncommittedChanges(
  * Parse command line arguments
  * Returns { branch, task, force, autonomous }
  * --force or -f: auto-create WIP commit if uncommitted changes exist
- * --autonomous or -a: track agent state for autonomous completion
+ * --autonomous or -a: track agent state and instruct to run gf finish
  */
 function parseArgs(args: string[]): {
 	branch?: string;
@@ -170,43 +177,45 @@ function parseArgs(args: string[]): {
 }
 
 /**
- * Completion reminder appended to tasks when in autonomous mode
- */
-const AUTONOMOUS_REMINDER = `
-
----
-IMPORTANT: When you have completed this task, run \`gf snap\` to commit your
-changes, then run \`gf finish\` to merge your work back to the base branch.`;
-
-/**
  * Build the agent command with optional task
  * If task is provided, appends it as an initial prompt: claude "task"
- * For Claude, adds --permission-mode acceptEdits to auto-accept edits
+ * For Claude, adds:
+ *   --permission-mode acceptEdits to auto-accept edits
+ *   --append-system-prompt with finish instruction (when autonomous)
  */
-function buildAgentCommand(baseCommand: string, task?: string): string {
+function buildAgentCommand(
+	baseCommand: string,
+	task?: string,
+	options?: { autonomous?: boolean },
+): string {
 	// For claude, add permission mode flag
 	const isClaude =
 		baseCommand === "claude" || baseCommand.startsWith("claude ");
 
+	if (!isClaude) {
+		// For non-claude agents, just append the task if provided
+		if (!task) return baseCommand;
+		const escapedTask = task.replace(/"/g, '\\"');
+		return `${baseCommand} "${escapedTask}"`;
+	}
+
+	// Build Claude command with flags
+	const flags = ["--permission-mode acceptEdits"];
+
+	// Add system prompt for autonomous mode
+	if (options?.autonomous) {
+		const systemPrompt =
+			"When you complete this task, use the gitterflow skill to finish and merge your changes back to the base branch.";
+		flags.push(`--append-system-prompt "${systemPrompt}"`);
+	}
+
+	// Build final command
 	if (!task) {
-		// No task - just add permission flag for claude
-		if (isClaude) {
-			return "claude --permission-mode acceptEdits";
-		}
-		return baseCommand;
+		return `claude ${flags.join(" ")}`;
 	}
 
-	// Escape double quotes in the task for shell safety
 	const escapedTask = task.replace(/"/g, '\\"');
-
-	// For claude, append the task as an initial prompt with permission mode
-	// claude --permission-mode acceptEdits "Your task: ..." starts claude with that prompt
-	if (isClaude) {
-		return `claude --permission-mode acceptEdits "${escapedTask}"`;
-	}
-
-	// For other agents, just append the task
-	return `${baseCommand} "${escapedTask}"`;
+	return `claude ${flags.join(" ")} "${escapedTask}"`;
 }
 
 /**
@@ -246,13 +255,6 @@ function generateRandomBranchName(): string {
 	return `worktree-${adjective}-${noun}-${randomNum}`;
 }
 
-/**
- * Extended context with optional rootDir for testing
- */
-type NewCommandContext = CommandContext & {
-	rootDir?: string;
-};
-
 export const newCommand: CommandDefinition & {
 	run: (context: NewCommandContext) => Promise<number>;
 } = {
@@ -261,7 +263,7 @@ export const newCommand: CommandDefinition & {
 		"Create a git worktree (optionally specify branch name and task)",
 	usage: "gitterflow new [branch] [--task <prompt>] [--force] [--autonomous]",
 	run: async ({ args, stderr, stdout, exec, rootDir }: NewCommandContext) => {
-		// Parse arguments for branch name, task, force flag, and autonomous flag
+		// Parse arguments for branch name, task, force, and autonomous flags
 		const { branch, task, force, autonomous } = parseArgs(args);
 		const run = exec ?? $;
 
@@ -358,12 +360,12 @@ export const newCommand: CommandDefinition & {
 				// User will just see the trust dialog once
 			}
 
-			// Write agent state for autonomous mode
+			// Write initial agent state if autonomous mode
 			if (autonomous) {
 				await writeAgentState(
 					{
 						branch: trimmedBranch,
-						task: task || "No task specified",
+						task: task ?? "No task specified",
 						status: "running",
 						started_at: new Date().toISOString(),
 						worktree_path: absoluteWorktreePath,
@@ -372,9 +374,6 @@ export const newCommand: CommandDefinition & {
 					rootDir,
 				);
 			}
-
-			// Prepare the final task with completion reminder for autonomous mode
-			const finalTask = autonomous && task ? task + AUTONOMOUS_REMINDER : task;
 
 			// Output informative messages
 			stdout(`✅ Created worktree for branch ${trimmedBranch}`);
@@ -388,7 +387,9 @@ export const newCommand: CommandDefinition & {
 			if (!skipTerminalSpawn) {
 				try {
 					const baseAgentCommand = getSetting("coding_agent");
-					const agentCommand = buildAgentCommand(baseAgentCommand, finalTask);
+					const agentCommand = buildAgentCommand(baseAgentCommand, task, {
+						autonomous,
+					});
 					const ide = getSetting("ide");
 					const openTerminal = getSetting("open_terminal");
 
@@ -411,7 +412,9 @@ export const newCommand: CommandDefinition & {
 				} catch {
 					// If spawning fails, fall back to outputting commands
 					const baseAgentCommand = getSetting("coding_agent");
-					const agentCommand = buildAgentCommand(baseAgentCommand, finalTask);
+					const agentCommand = buildAgentCommand(baseAgentCommand, task, {
+						autonomous,
+					});
 					stdout(`cd ${absoluteWorktreePath}`);
 					stdout(`${agentCommand}`);
 					stderr(
@@ -421,7 +424,9 @@ export const newCommand: CommandDefinition & {
 			} else {
 				// In test/CI environment, just output the commands
 				const baseAgentCommand = getSetting("coding_agent");
-				const agentCommand = buildAgentCommand(baseAgentCommand, finalTask);
+				const agentCommand = buildAgentCommand(baseAgentCommand, task, {
+					autonomous,
+				});
 				stdout(`cd ${absoluteWorktreePath}`);
 				stdout(`${agentCommand}`);
 			}
