@@ -4,10 +4,21 @@ import * as yaml from "yaml";
 
 /**
  * Valid status values for an agent task
+ *
+ * Status transitions:
+ *   pending → running → ready → merged
+ *                         ↓
+ *                      conflict → [brain resolves] → merged
+ *                         ↓
+ *                       failed
+ *
+ * Note: 'completed' is deprecated for autonomous agents.
+ * Use 'ready' (work done, awaiting brain merge) or 'merged' (brain completed merge).
  */
 export type AgentStatus =
 	| "pending"
 	| "running"
+	| "ready"
 	| "completed"
 	| "failed"
 	| "conflict"
