@@ -64,8 +64,11 @@ gf new [branch-name]
 # Create worktree with initial task for Claude Code
 gf new --task "Implement user authentication"
 
-# Create worktree for autonomous agent (Phase 2 - coming soon)
+# Create worktree for autonomous agent (auto-merges when done)
 gf new --task "Add retry logic" --autonomous
+
+# Check status of autonomous agents
+gf status
 
 # List active worktrees (interactive selector)
 gf list
@@ -216,7 +219,7 @@ Creates a new git worktree with an optional branch name. If no branch name is pr
   gf new --task "Implement shell completions for bash/zsh/fish"
   gf new feature-auth --task "Add OAuth2 authentication"
   ```
-- `--autonomous` - (Coming soon) Run agent autonomously, auto-merge when done
+- `--autonomous` or `-a` - Run agent autonomously, auto-merge when done
 
 ### `gitterflow list`
 
@@ -257,12 +260,32 @@ Automatically commits staged or modified changes with an AI-generated commit mes
 
 Completes work on a feature branch by merging it into the base branch.
 
-- Commits any uncommitted changes (using `snap` logic)
+- Commits any uncommitted changes (using AI-generated message)
+- Auto-stashes uncommitted changes in base branch if needed
 - Checks out base branch and pulls latest changes
 - Merges feature branch into base branch
-- Pushes updated base branch to origin
+- Auto-pops stashed changes after merge
 - Optionally deletes local/remote branches and removes worktree
+- Updates agent state if running autonomously
 - Aborts if already on base branch
+
+### `gitterflow status`
+
+Shows status of all autonomous agents.
+
+```
+AUTONOMOUS AGENTS
+─────────────────────────────────────────────────────────────────────
+Branch                    Status       Task                      Started
+─────────────────────────────────────────────────────────────────────
+worktree-happy-fox-123    running      Add retry logic...        2 min ago
+worktree-calm-tiger-456   merged       Fix auth bug...           5 min ago
+─────────────────────────────────────────────────────────────────────
+```
+
+- Shows all agents spawned with `--autonomous` flag
+- Status can be: `running`, `completed`, `merged`, `failed`, `conflict`
+- Displays task summary and start time
 
 ## Development
 
@@ -399,12 +422,12 @@ GitHub Actions automatically:
 - [x] Shell alias creation
 
 ### Phase 2: Agent Orchestration 🚧
-- [ ] `--autonomous` flag - Sub-agents auto-finish when done
-- [ ] `gf status` - Check status of running agents
-- [ ] Agent state tracking in `.gitterflow/agents/`
+- [x] `--autonomous` flag - Sub-agents auto-finish when done
+- [x] `gf status` - Check status of running agents
+- [x] Agent state tracking in `.gitterflow/agents/`
+- [x] GitterFlow skill for Claude Code (`.claude/skills/gitterflow/SKILL.md`)
 - [ ] `gf mark-failed` - Mark failed agents
 - [ ] `gf notify-complete` - Hook integration for notifications
-- [x] GitterFlow skill for Claude Code (`.claude/skills/gitterflow/SKILL.md`)
 - [ ] Hooks setup in `gf init`
 
 ### Phase 3: Advanced Features
