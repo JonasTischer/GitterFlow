@@ -3,6 +3,7 @@ import { finishCommand } from "./finish";
 import { helpCommand } from "./help";
 import { initCommand } from "./init";
 import { listCommand } from "./list";
+import { markFailedCommand } from "./mark-failed";
 import { newCommand } from "./new";
 import { snapCommand } from "./snap";
 import { statusCommand } from "./status";
@@ -17,6 +18,7 @@ export const commandMap: Record<string, CommandDefinition> = {
 	snap: snapCommand,
 	finish: finishCommand,
 	status: statusCommand,
+	"mark-failed": markFailedCommand,
 };
 
 for (const definition of Object.values(commandMap)) {
@@ -34,5 +36,6 @@ export const orderedCommands: CommandDefinition[] = [
 	deleteCommand,
 	snapCommand,
 	finishCommand,
+	markFailedCommand,
 	helpCommand,
 ];
