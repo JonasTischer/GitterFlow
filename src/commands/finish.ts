@@ -705,7 +705,23 @@ export const finishCommand: CommandDefinition & {
 			// Step 7: Merge feature branch into base branch
 			stdout(`\n🔀 Merging ${currentBranch} into ${baseBranch}...`);
 			try {
-				await mergeRun`git merge ${currentBranch} --no-edit`;
+				// Read agent state to get task description for merge message
+				let mergeMessage: string;
+				try {
+					const agentState = await readAgentState(currentBranch, rootDir);
+					if (agentState?.task) {
+						// Use task as merge message: "Merge branch 'xyz': task description"
+						mergeMessage = `Merge branch '${currentBranch}': ${agentState.task}`;
+					} else {
+						// Fallback for non-autonomous worktrees
+						mergeMessage = `Merge branch '${currentBranch}'`;
+					}
+				} catch {
+					// If reading agent state fails, use fallback message
+					mergeMessage = `Merge branch '${currentBranch}'`;
+				}
+
+				await mergeRun`git merge ${currentBranch} -m ${mergeMessage}`;
 				stdout(`✅ Successfully merged ${currentBranch} into ${baseBranch}`);
 
 				// Step 7.5: Auto-pop stashed changes after successful merge
