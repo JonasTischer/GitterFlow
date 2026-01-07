@@ -107,18 +107,76 @@ If a sub-agent completes but has merge conflicts:
 
 ## For Sub-Agents: Completing Your Task
 
-If you are a sub-agent spawned by GitterFlow, run `gf finish` when your task is complete. This command:
+If you are a sub-agent spawned by GitterFlow, run `gf ready` when your task is complete:
 
+```bash
+gf ready
+```
+
+This command:
 1. **Auto-commits** any uncommitted changes with an AI-generated message
-2. **Merges** your branch back to the base branch
-3. **Cleans up** the worktree and branch
+2. **Marks your work as ready** for the brain to merge
+3. **Exits successfully** - you're done!
 
-**Important**: Just run `gf finish` - you don't need to commit first. The command handles everything.
+**IMPORTANT - Do NOT use `gf finish`!** The brain agent will handle merging.
 
-If `gf finish` fails due to merge conflicts:
-- Resolve the conflicts manually
-- Stage the resolved files: `git add .`
-- Run `gf finish` again
+### Why `gf ready` instead of `gf finish`?
+
+You can't see what other sub-agents are doing. If you try to merge directly:
+- You might conflict with another agent's recent merge
+- You lack context to resolve conflicts correctly
+- You could corrupt the base branch for everyone
+
+The brain agent coordinates all merges because it has full visibility into all agents' work.
+
+### After running `gf ready`:
+- Your status changes to `ready`
+- The brain sees you're ready via `gf status`
+- The brain merges your work at the right time
+- The brain handles any conflicts with full context
+
+## For Brain Agents: Merging Sub-Agent Work
+
+When you are the orchestrating "brain" agent coordinating sub-agents:
+
+### 1. Monitor Progress
+```bash
+gf status
+```
+Look for agents with `ready` status - these have completed their work and are awaiting merge.
+
+### 2. Merge Ready Branches
+For each ready branch, go to the base branch directory and merge:
+
+```bash
+# In the main repo (not a worktree)
+git checkout main
+git pull origin main
+git merge <branch-name>
+```
+
+If merge succeeds, the agent's work is now in the base branch.
+
+### 3. Handle Conflicts
+If a merge conflicts:
+1. You're left in the base branch with conflict markers
+2. Review both sides - you have context from ALL agents
+3. Resolve based on your understanding of the full picture
+4. Complete the merge: `git add . && git commit`
+
+### 4. Merge Order Considerations
+- Independent features: any order works
+- Overlapping changes: merge simpler/foundation changes first
+- If unsure, review diffs before deciding order
+
+### 5. Update Agent Status (Future Enhancement)
+After successful merge, update the agent's status:
+```bash
+# This will be automated in future versions
+# For now, the worktree can be cleaned up manually:
+git worktree remove <worktree-path>
+git branch -d <branch-name>
+```
 
 ## Important Notes
 
@@ -126,3 +184,4 @@ If `gf finish` fails due to merge conflicts:
 - Each sub-agent is completely independent - they cannot communicate with each other
 - Monitor `gf status` to track progress of all agents
 - Keep tasks independent to avoid merge conflicts
+- Brain agents should handle ALL merges - sub-agents should only use `gf ready`
