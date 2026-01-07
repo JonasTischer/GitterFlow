@@ -6,7 +6,7 @@ This document tracks known issues and planned improvements for GitterFlow.
 
 ## Issue 1: Merge Commit Messages Are Too Generic
 
-**Status:** Open
+**Status:** ✅ Done (uses agent task as merge message in `finish.ts:708-714`)
 **Priority:** Medium
 **Location:** `src/commands/finish.ts:708`
 
@@ -58,7 +58,7 @@ For non-autonomous worktrees (no agent state), fall back to Option B or a simple
 
 ## Issue 2: Subagent Permission Inheritance
 
-**Status:** Open
+**Status:** ✅ Done (`.claude` added to default `symlink_files` in `config.ts`)
 **Priority:** High
 **Location:** `src/commands/new.ts:203`
 
@@ -126,7 +126,7 @@ This ensures subagents inherit:
 
 ## Issue 3: Brain-Subagent Orchestration Loop
 
-**Status:** Open
+**Status:** ⚠️ Partial (`gf started` ✅, `gf notify-complete` ❌, init hooks ❌)
 **Priority:** High
 **Location:** New feature
 
@@ -508,7 +508,7 @@ Claude Code CLI may not directly support the memory tool API. Options:
 
 ## Issue 5: Safe Merge Strategy (Brain-Controlled Merges)
 
-**Status:** Open
+**Status:** ✅ Done (`gf ready` command + `SAFE-MERGE-DESIGN.md`)
 **Priority:** Critical
 **Location:** `src/commands/finish.ts`, `SKILL.md`
 
@@ -690,7 +690,7 @@ gf status --write "Blocked: need clarification on X"
 
 ## Issue 6: Subagent Plan-Then-Execute with Brain Approval
 
-**Status:** Open
+**Status:** ✅ Done (`gf approve` + `gf reject` commands + `PLAN-APPROVAL-DESIGN.md`)
 **Priority:** High
 **Location:** `src/commands/new.ts`, `SKILL.md`
 
@@ -936,7 +936,7 @@ When subagents are in `awaiting_approval` status:
 
 ## Issue 7: Evaluate Claude Agent SDK as Foundation
 
-**Status:** Open
+**Status:** ✅ Done (research in `AGENT-SDK-EVALUATION.md`)
 **Priority:** High (Architectural Decision)
 **Location:** Entire codebase
 **Reference:** https://platform.claude.com/docs/en/agent-sdk/overview
