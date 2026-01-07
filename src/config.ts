@@ -31,7 +31,7 @@ export function loadConfig(): GitterflowConfig {
 			coding_agent: "claude",
 			terminal: "iterm",
 			ide: null,
-			symlink_files: [],
+			symlink_files: [".claude"],
 		};
 		return cachedConfig;
 	}
@@ -49,7 +49,7 @@ export function loadConfig(): GitterflowConfig {
 		coding_agent: parsed.coding_agent ?? "claude",
 		terminal: parsed.terminal ?? "iterm",
 		ide: parsed.ide ?? null,
-		symlink_files: parsed.symlink_files ?? [],
+		symlink_files: parsed.symlink_files ?? [".claude"],
 	};
 
 	return cachedConfig;
@@ -60,4 +60,11 @@ export function getSetting<K extends keyof GitterflowConfig>(
 ): GitterflowConfig[K] {
 	const cfg = loadConfig();
 	return cfg[key];
+}
+
+/**
+ * Clear the config cache (used for testing)
+ */
+export function clearConfigCache(): void {
+	cachedConfig = null;
 }

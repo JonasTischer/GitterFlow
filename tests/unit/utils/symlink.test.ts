@@ -177,4 +177,70 @@ describe("createSymlinks", () => {
 		const linkTarget = readlinkSync(symlinkPath);
 		expect(linkTarget).toBe("../../main/backend/.env");
 	});
+
+	test("should symlink .claude directory for permission inheritance", () => {
+		// Create .claude directory structure in main repo (simulates Claude Code settings)
+		mkdirSync(join(mainRepo, ".claude"), { recursive: true });
+		writeFileSync(
+			join(mainRepo, ".claude", "settings.json"),
+			JSON.stringify({
+				permissions: {
+					allow: ["Bash(bun test:*)"],
+				},
+			}),
+		);
+
+		// Create a skills directory inside .claude
+		mkdirSync(join(mainRepo, ".claude", "skills"), { recursive: true });
+		writeFileSync(
+			join(mainRepo, ".claude", "skills", "test-skill.md"),
+			"# Test Skill",
+		);
+
+		createSymlinks(mainRepo, worktree, [".claude"]);
+
+		// Verify .claude symlink was created
+		const symlinkPath = join(worktree, ".claude");
+		expect(existsSync(symlinkPath)).toBe(true);
+
+		// Verify it's a symlink pointing to correct relative path
+		const linkTarget = readlinkSync(symlinkPath);
+		expect(linkTarget).toBe("../main/.claude");
+
+		// Verify we can access contents through the symlink
+		const settingsContent = Bun.file(
+			join(worktree, ".claude", "settings.json"),
+		).text();
+		expect(settingsContent).resolves.toContain("Bash(bun test:*)");
+
+		// Verify nested directories are accessible
+		const skillContent = Bun.file(
+			join(worktree, ".claude", "skills", "test-skill.md"),
+		).text();
+		expect(skillContent).resolves.toContain("# Test Skill");
+	});
+
+	test("should include .claude in default symlink files for subagent permission inheritance", async () => {
+		// This tests that the config defaults include .claude
+		// We need to clear the cached config and run from a directory without .gitterflow.yaml
+		const {
+			loadConfig,
+			clearConfigCache,
+		} = await import("../../../src/config");
+
+		// Clear cached config and change to test directory (which has no .gitterflow.yaml)
+		clearConfigCache();
+		const originalCwd = process.cwd();
+		process.chdir(testDir);
+
+		try {
+			const config = loadConfig();
+			// .claude should be included in default symlink_files
+			expect(config.symlink_files).toContain(".claude");
+		} finally {
+			// Restore original working directory and clear cache
+			process.chdir(originalCwd);
+			clearConfigCache();
+		}
+	});
 });
