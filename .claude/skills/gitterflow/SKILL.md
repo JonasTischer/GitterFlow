@@ -120,9 +120,92 @@ If `gf finish` fails due to merge conflicts:
 - Stage the resolved files: `git add .`
 - Run `gf finish` again
 
+## Plan Mode (Plan-Then-Execute Workflow)
+
+> **Note**: This feature is in design phase. See `docs/PLAN-APPROVAL-DESIGN.md`.
+
+### Overview
+
+Plan mode enables a two-phase workflow where subagents write an implementation plan before executing. The brain agent reviews and approves/rejects plans before any code is written.
+
+### For Brain Agents: Spawning with Plan Mode
+
+```bash
+# Spawn subagent in plan-first mode
+gf new --task "Implement feature X" --plan-first --autonomous
+```
+
+This will:
+1. Start the subagent with `--permission-mode plan` (read-only)
+2. Subagent analyzes codebase and writes plan
+3. Subagent sets status to `awaiting_approval` and exits
+4. Brain reviews plan and runs `gf approve` or `gf reject`
+
+### For Brain Agents: Plan Review Protocol
+
+When subagents are in `awaiting_approval` status:
+
+1. **Check status**: `gf status` shows agents awaiting approval
+2. **Read plan**: Plan is at `.gitterflow/agents/{branch}/plan.md`
+3. **Evaluate**:
+   - Does the approach align with overall architecture?
+   - Are there conflicts with other agents' plans?
+   - Is the scope appropriate?
+4. **Decide**:
+   - `gf approve <branch>` - Plan is good, start execution
+   - `gf reject <branch> --message "feedback"` - Needs revision
+
+### For Sub-Agents: Plan Mode Instructions
+
+If you were spawned with `--plan-first`, you are in **plan mode**:
+
+1. **Analyze only** - You have read-only access (Read, Glob, Grep, WebSearch)
+2. **Write your plan** to: `.gitterflow/agents/{your-branch}/plan.md`
+3. **Update status**: Run `gf status --write "awaiting_approval"`
+4. **Exit** - Do NOT implement anything yet
+
+**Plan file format:**
+```markdown
+# Implementation Plan: {task summary}
+
+## Analysis
+- Examined files: [list]
+- Key findings: [summary]
+
+## Approach
+1. Step one
+2. Step two
+
+## Files to Modify
+| File | Changes |
+|------|---------|
+| src/foo.ts | Add new function |
+
+## Files to Create
+- src/new-feature.ts - Main implementation
+
+## Risks and Considerations
+- Risk 1: mitigation
+
+## Questions for Brain (if any)
+- Should we use approach A or B?
+```
+
+### Plan Approval Commands (Placeholder)
+
+```bash
+# Approve a plan and start execution phase
+gf approve <branch>
+gf approve <branch> --message "Looks good, proceed"
+
+# Reject a plan with feedback
+gf reject <branch> --message "Use exponential backoff instead"
+```
+
 ## Important Notes
 
 - Sub-agents merge to **your current branch** (the branch you were on when spawning)
 - Each sub-agent is completely independent - they cannot communicate with each other
 - Monitor `gf status` to track progress of all agents
 - Keep tasks independent to avoid merge conflicts
+- **Plan mode** prevents wasted work by validating approach before implementation

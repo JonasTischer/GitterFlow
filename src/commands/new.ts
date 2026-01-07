@@ -140,20 +140,23 @@ async function promptUncommittedChanges(
 
 /**
  * Parse command line arguments
- * Returns { branch, task, force, autonomous }
+ * Returns { branch, task, force, autonomous, planFirst }
  * --force or -f: auto-create WIP commit if uncommitted changes exist
  * --autonomous or -a: track agent state and instruct to run gf finish
+ * --plan-first or -p: start in plan mode, require brain approval before execution
  */
 function parseArgs(args: string[]): {
 	branch?: string;
 	task?: string;
 	force?: boolean;
 	autonomous?: boolean;
+	planFirst?: boolean;
 } {
 	let branch: string | undefined;
 	let task: string | undefined;
 	let force = false;
 	let autonomous = false;
+	let planFirst = false;
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i] ?? "";
@@ -165,6 +168,8 @@ function parseArgs(args: string[]): {
 			force = true;
 		} else if (arg === "--autonomous" || arg === "-a") {
 			autonomous = true;
+		} else if (arg === "--plan-first" || arg === "-p") {
+			planFirst = true;
 		} else if (!arg.startsWith("-")) {
 			// Non-flag argument is the branch name
 			if (!branch) {
@@ -173,7 +178,7 @@ function parseArgs(args: string[]): {
 		}
 	}
 
-	return { branch, task, force, autonomous };
+	return { branch, task, force, autonomous, planFirst };
 }
 
 /**
@@ -261,10 +266,25 @@ export const newCommand: CommandDefinition & {
 	name: "new",
 	description:
 		"Create a git worktree (optionally specify branch name and task)",
-	usage: "gitterflow new [branch] [--task <prompt>] [--force] [--autonomous]",
+	usage:
+		"gitterflow new [branch] [--task <prompt>] [--force] [--autonomous] [--plan-first]",
 	run: async ({ args, stderr, stdout, exec, rootDir }: NewCommandContext) => {
-		// Parse arguments for branch name, task, force, and autonomous flags
-		const { branch, task, force, autonomous } = parseArgs(args);
+		// Parse arguments for branch name, task, force, autonomous, and planFirst flags
+		const { branch, task, force, autonomous, planFirst } = parseArgs(args);
+
+		// TODO: Implement --plan-first workflow (Issue 6)
+		// When planFirst is true:
+		// 1. Start claude with --permission-mode plan
+		// 2. Add system prompt for writing plan file
+		// 3. Set initial status to "pending", update to "awaiting_approval" when plan written
+		// 4. Brain uses "gf approve" or "gf reject" to control execution
+		// See docs/PLAN-APPROVAL-DESIGN.md for full design
+		if (planFirst) {
+			stdout(
+				"⚠️  --plan-first is not yet implemented. See docs/PLAN-APPROVAL-DESIGN.md",
+			);
+			stdout("   Falling back to normal autonomous mode.");
+		}
 		const run = exec ?? $;
 
 		// Check for uncommitted changes

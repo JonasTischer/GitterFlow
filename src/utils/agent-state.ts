@@ -7,6 +7,7 @@ import * as yaml from "yaml";
  */
 export type AgentStatus =
 	| "pending"
+	| "awaiting_approval" // Plan written, waiting for brain to review
 	| "running"
 	| "completed"
 	| "failed"
@@ -37,6 +38,8 @@ export interface AgentState {
 	error?: string;
 	/** Status message from agent (set via gf status --write) */
 	message?: string;
+	/** Path to the plan file (for awaiting_approval status) */
+	plan_file?: string;
 }
 
 /**
