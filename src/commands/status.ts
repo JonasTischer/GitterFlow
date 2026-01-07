@@ -96,6 +96,20 @@ function sortByStatus(agents: AgentState[]): AgentState[] {
 }
 
 /**
+ * Format the started/spawned time for an agent
+ * For pending agents, use spawned_at and append "(spawned)"
+ * For other statuses, use started_at
+ */
+function formatStartedTime(agent: AgentState): string {
+	if (agent.status === "pending") {
+		// Use spawned_at for pending agents, fall back to started_at
+		const timestamp = agent.spawned_at ?? agent.started_at;
+		return `${formatRelativeTime(timestamp)} (spawned)`;
+	}
+	return formatRelativeTime(agent.started_at);
+}
+
+/**
  * Format a single agent row
  */
 function formatAgentRow(agent: AgentState): string {
@@ -108,7 +122,7 @@ function formatAgentRow(agent: AgentState): string {
 		truncate(agent.task, COLUMN_WIDTHS.task),
 		COLUMN_WIDTHS.task,
 	);
-	const started = formatRelativeTime(agent.started_at);
+	const started = formatStartedTime(agent);
 
 	return `${branch} ${status} ${task} ${started}`;
 }

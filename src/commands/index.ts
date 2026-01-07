@@ -6,6 +6,7 @@ import { listCommand } from "./list";
 import { markFailedCommand } from "./mark-failed";
 import { newCommand } from "./new";
 import { snapCommand } from "./snap";
+import { startedCommand } from "./started";
 import { statusCommand } from "./status";
 import type { CommandDefinition } from "./types";
 
@@ -17,6 +18,7 @@ export const commandMap: Record<string, CommandDefinition> = {
 	delete: deleteCommand,
 	snap: snapCommand,
 	finish: finishCommand,
+	started: startedCommand,
 	status: statusCommand,
 	"mark-failed": markFailedCommand,
 };

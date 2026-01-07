@@ -427,7 +427,7 @@ describe("new command", () => {
 
 			const state = await readAgentState("feature-autonomous", testDir);
 			expect(state).toBeDefined();
-			expect(state?.status).toBe("running");
+			expect(state?.status).toBe("pending");
 			expect(state?.task).toBe("Test autonomous task");
 			expect(state?.branch).toBe("feature-autonomous");
 			expect(state?.base_branch).toBe("main"); // From mock exec
@@ -446,7 +446,7 @@ describe("new command", () => {
 
 			const state = await readAgentState("feature-shorthand", testDir);
 			expect(state).toBeDefined();
-			expect(state?.status).toBe("running");
+			expect(state?.status).toBe("pending");
 		});
 
 		test("should set worktree_path in agent state", async () => {
@@ -465,7 +465,7 @@ describe("new command", () => {
 			expect(state?.worktree_path).toContain("feature-path");
 		});
 
-		test("should set started_at timestamp in agent state", async () => {
+		test("should set spawned_at timestamp in agent state", async () => {
 			const { exec } = captureExec();
 			const { io } = commandIO();
 
@@ -479,10 +479,12 @@ describe("new command", () => {
 			const afterTime = new Date().toISOString();
 
 			const state = await readAgentState("feature-timestamp", testDir);
-			expect(state?.started_at).toBeDefined();
+			expect(state?.spawned_at).toBeDefined();
 			// Check timestamp is within the time window
-			expect(state?.started_at >= beforeTime).toBe(true);
-			expect(state?.started_at <= afterTime).toBe(true);
+			expect(state?.spawned_at && state.spawned_at >= beforeTime).toBe(true);
+			expect(state?.spawned_at && state.spawned_at <= afterTime).toBe(true);
+			// started_at should match spawned_at initially (will be updated by gf started)
+			expect(state?.started_at).toBe(state?.spawned_at);
 		});
 
 		test("should use 'No task specified' when no task provided with --autonomous", async () => {

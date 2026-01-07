@@ -23,8 +23,10 @@ export interface AgentState {
 	task: string;
 	/** Current status of the agent */
 	status: AgentStatus;
-	/** ISO timestamp when the task was started */
+	/** ISO timestamp when the task was started (updated when agent actually starts) */
 	started_at: string;
+	/** ISO timestamp when the terminal was spawned (for pending status display) */
+	spawned_at?: string;
 	/** ISO timestamp when the task completed (for terminal states) */
 	completed_at?: string;
 	/** Absolute path to the worktree directory */

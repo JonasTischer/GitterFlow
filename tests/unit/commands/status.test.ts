@@ -130,6 +130,93 @@ describe("status command", () => {
 			// Should show relative time like "2 min ago" or similar
 			expect(output).toMatch(/\d+\s*(min|sec|hour|day).*ago/i);
 		});
+
+		test("should display '(spawned)' suffix for pending agents", async () => {
+			const { io, stdoutMessages } = commandIO();
+
+			// Create a pending agent state with spawned_at
+			const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+			const state: AgentState = {
+				branch: "feature-pending",
+				task: "Pending task",
+				status: "pending",
+				started_at: twoMinutesAgo.toISOString(),
+				spawned_at: twoMinutesAgo.toISOString(),
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+
+			await writeAgentState(state, testDir);
+
+			const exitCode = await statusCommand.run({
+				args: [],
+				...io,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+			const output = stdoutMessages.join("\n");
+			// Should show "(spawned)" for pending agents
+			expect(output).toContain("(spawned)");
+			// Should still show relative time
+			expect(output).toMatch(/\d+\s*(min|sec).*ago.*\(spawned\)/i);
+		});
+
+		test("should use spawned_at time for pending agents", async () => {
+			const { io, stdoutMessages } = commandIO();
+
+			// spawned_at is 5 minutes ago, started_at is later (shouldn't matter for pending)
+			const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+			const state: AgentState = {
+				branch: "feature-pending-time",
+				task: "Pending time test",
+				status: "pending",
+				started_at: fiveMinutesAgo.toISOString(),
+				spawned_at: fiveMinutesAgo.toISOString(),
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+
+			await writeAgentState(state, testDir);
+
+			const exitCode = await statusCommand.run({
+				args: [],
+				...io,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+			const output = stdoutMessages.join("\n");
+			// Should show 5 min ago (using spawned_at)
+			expect(output).toContain("5 min ago");
+		});
+
+		test("should NOT display '(spawned)' suffix for running agents", async () => {
+			const { io, stdoutMessages } = commandIO();
+
+			const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+			const state: AgentState = {
+				branch: "feature-running",
+				task: "Running task",
+				status: "running",
+				started_at: twoMinutesAgo.toISOString(),
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+
+			await writeAgentState(state, testDir);
+
+			const exitCode = await statusCommand.run({
+				args: [],
+				...io,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+			const output = stdoutMessages.join("\n");
+			// Should NOT show "(spawned)" for running agents
+			expect(output).not.toContain("(spawned)");
+		});
 	});
 
 	describe("status grouping and ordering", () => {

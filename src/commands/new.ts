@@ -362,12 +362,14 @@ export const newCommand: CommandDefinition & {
 
 			// Write initial agent state if autonomous mode
 			if (autonomous) {
+				const now = new Date().toISOString();
 				await writeAgentState(
 					{
 						branch: trimmedBranch,
 						task: task ?? "No task specified",
-						status: "running",
-						started_at: new Date().toISOString(),
+						status: "pending",
+						started_at: now,
+						spawned_at: now,
 						worktree_path: absoluteWorktreePath,
 						base_branch: currentBranch,
 					},
