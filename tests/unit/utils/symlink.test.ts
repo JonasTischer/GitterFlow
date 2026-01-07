@@ -223,10 +223,9 @@ describe("createSymlinks", () => {
 	test("should include .claude in default symlink files for subagent permission inheritance", async () => {
 		// This tests that the config defaults include .claude
 		// We need to clear the cached config and run from a directory without .gitterflow.yaml
-		const {
-			loadConfig,
-			clearConfigCache,
-		} = await import("../../../src/config");
+		const { loadConfig, clearConfigCache } = await import(
+			"../../../src/config"
+		);
 
 		// Clear cached config and change to test directory (which has no .gitterflow.yaml)
 		clearConfigCache();
