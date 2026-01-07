@@ -548,4 +548,223 @@ describe("finish command", () => {
 			expect(stashPopCommand).toBeUndefined();
 		});
 	});
+
+	describe("merge commit messages", () => {
+		// Helper to create a mock exec that tracks merge commands
+		const createMergeTrackingMockExec = (options: {
+			currentBranch: string;
+			baseBranch?: string;
+			mergeSuccess?: boolean;
+		}) => {
+			const {
+				currentBranch,
+				baseBranch = "main",
+				mergeSuccess = true,
+			} = options;
+
+			const executedCommands: string[] = [];
+
+			const exec = async (
+				strings: TemplateStringsArray,
+				...values: unknown[]
+			) => {
+				const command = strings.join("{{VALUE}}");
+				const fullCommand = values.reduce(
+					(cmd: string, val: unknown) => cmd.replace("{{VALUE}}", String(val)),
+					command,
+				) as string;
+
+				executedCommands.push(fullCommand);
+
+				// Mock git rev-parse --abbrev-ref HEAD
+				if (fullCommand.includes("git rev-parse --abbrev-ref HEAD")) {
+					return { text: async () => currentBranch };
+				}
+
+				// Mock git config for base branch lookup
+				if (fullCommand.includes("gitterflow-base-branch")) {
+					return { text: async () => baseBranch };
+				}
+
+				// Mock git rev-parse --git-common-dir
+				if (fullCommand.includes("git rev-parse --git-common-dir")) {
+					return { text: async () => ".git" };
+				}
+
+				// Mock git status --porcelain (no uncommitted changes)
+				if (fullCommand.includes("git status --porcelain")) {
+					return { text: async () => "" };
+				}
+
+				// Mock git fetch
+				if (fullCommand.includes("git fetch")) {
+					return {};
+				}
+
+				// Mock git checkout
+				if (fullCommand.includes("git checkout")) {
+					return {};
+				}
+
+				// Mock git pull
+				if (fullCommand.includes("git pull")) {
+					return {};
+				}
+
+				// Mock git merge
+				if (fullCommand.includes("git merge")) {
+					if (!mergeSuccess) {
+						throw new Error("git merge failed");
+					}
+					return {};
+				}
+
+				// Mock git show-ref
+				if (fullCommand.includes("git show-ref")) {
+					return {};
+				}
+
+				// Mock git worktree remove
+				if (fullCommand.includes("git worktree remove")) {
+					return {};
+				}
+
+				// Mock git branch -d
+				if (fullCommand.includes("git branch -d")) {
+					return {};
+				}
+
+				// Mock git push
+				if (fullCommand.includes("git push")) {
+					return {};
+				}
+
+				// Mock git add
+				if (fullCommand.includes("git add")) {
+					return {};
+				}
+
+				// Mock git diff (no changes)
+				if (fullCommand.includes("git diff --cached")) {
+					return { text: async () => "" };
+				}
+
+				return {};
+			};
+
+			return { exec, executedCommands };
+		};
+
+		test("should use agent task as merge commit message when agent state exists", async () => {
+			const { io } = commandIO();
+
+			// Setup: create agent state with a descriptive task
+			const agentTask = "Implement user authentication with JWT tokens";
+			const initialState: AgentState = {
+				branch: "feature-with-task",
+				task: agentTask,
+				status: "running",
+				started_at: "2024-01-15T10:00:00.000Z",
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+			await writeAgentState(initialState, testDir);
+
+			const { exec, executedCommands } = createMergeTrackingMockExec({
+				currentBranch: "feature-with-task",
+				baseBranch: "main",
+				mergeSuccess: true,
+			});
+
+			const exitCode = await finishCommand.run({
+				args: [],
+				...io,
+				exec,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+
+			// Find the merge command
+			const mergeCommand = executedCommands.find((cmd) =>
+				cmd.includes("git merge"),
+			);
+			expect(mergeCommand).toBeDefined();
+
+			// Verify the merge command includes -m flag with the task
+			expect(mergeCommand).toContain("-m");
+			expect(mergeCommand).toContain(agentTask);
+		});
+
+		test("should use fallback message with commit count when no agent state exists", async () => {
+			const { io } = commandIO();
+
+			// No agent state created - simulates non-autonomous worktree
+
+			const { exec, executedCommands } = createMergeTrackingMockExec({
+				currentBranch: "feature-no-agent-state",
+				baseBranch: "main",
+				mergeSuccess: true,
+			});
+
+			const exitCode = await finishCommand.run({
+				args: [],
+				...io,
+				exec,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+
+			// Find the merge command
+			const mergeCommand = executedCommands.find((cmd) =>
+				cmd.includes("git merge"),
+			);
+			expect(mergeCommand).toBeDefined();
+
+			// Verify the merge command includes -m flag with branch name
+			expect(mergeCommand).toContain("-m");
+			expect(mergeCommand).toContain("feature-no-agent-state");
+		});
+
+		test("should include branch name in merge message along with task", async () => {
+			const { io } = commandIO();
+
+			// Setup: create agent state
+			const initialState: AgentState = {
+				branch: "worktree-clever-fox-123",
+				task: "Fix pagination bug in user list",
+				status: "running",
+				started_at: "2024-01-15T10:00:00.000Z",
+				worktree_path: "/path/to/worktree",
+				base_branch: "main",
+			};
+			await writeAgentState(initialState, testDir);
+
+			const { exec, executedCommands } = createMergeTrackingMockExec({
+				currentBranch: "worktree-clever-fox-123",
+				baseBranch: "main",
+				mergeSuccess: true,
+			});
+
+			const exitCode = await finishCommand.run({
+				args: [],
+				...io,
+				exec,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+
+			// Find the merge command
+			const mergeCommand = executedCommands.find((cmd) =>
+				cmd.includes("git merge"),
+			);
+			expect(mergeCommand).toBeDefined();
+
+			// Verify merge message contains both branch name and task
+			expect(mergeCommand).toContain("worktree-clever-fox-123");
+			expect(mergeCommand).toContain("Fix pagination bug in user list");
+		});
+	});
 });
