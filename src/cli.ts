@@ -2,6 +2,7 @@ import { $ } from "bun";
 import { commandMap, orderedCommands } from "./commands";
 import { helpCommand } from "./commands/help";
 import type { CommandExecutor, CommandIO } from "./commands/types";
+import packageJson from "../package.json";
 
 const defaultIO: CommandIO = {
 	stdout: (message: string) => console.log(message),
@@ -33,6 +34,13 @@ export async function runCli(
 	io: CommandIO = defaultIO,
 ): Promise<number> {
 	const [maybeCommand, ...commandArgs] = rawArgs;
+
+	// Handle --version flag
+	if (maybeCommand === "--version" || maybeCommand === "-v") {
+		io.stdout(`gitterflow v${packageJson.version}`);
+		return 0;
+	}
+
 	const commandKey = maybeCommand ?? "help";
 	const command = commandMap[commandKey];
 
