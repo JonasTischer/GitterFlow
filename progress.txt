@@ -10,4 +10,15 @@
 - [13:10] Pushed branch clawd/improvements
 
 ### Next Up
-- Implement --plan-first flag for gf new command
+- Add tests for --plan-first workflow
+- Implement gf spawn for batch agent creation
+
+---
+
+## Session: 2026-01-31 (continued)
+
+### Completed
+- [13:20] Implemented --plan-first flag for gf new
+- [13:20] Created gf approve command
+- [13:20] Created gf reject command
+- [13:20] Fixed notifications to use getNotificationSetting
