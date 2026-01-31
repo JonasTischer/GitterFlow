@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { $ } from "bun";
 import { getSetting } from "../config";
 import { readAgentState, updateAgentStatus } from "../utils/agent-state";
@@ -6,6 +7,51 @@ import type {
 	CommandDefinition,
 	CommandExecutor,
 } from "./types";
+
+/**
+ * Get the main repository directory (where .git is located)
+ * Works from both main repo and worktrees
+ */
+async function getMainRepoDir(
+	run: CommandExecutor | typeof $,
+): Promise<string> {
+	try {
+		const commonDirResult = run`git rev-parse --git-common-dir`;
+		let commonDir: string;
+		if (
+			typeof commonDirResult === "object" &&
+			commonDirResult !== null &&
+			"text" in commonDirResult &&
+			typeof commonDirResult.text === "function"
+		) {
+			commonDir = (await commonDirResult.text()).trim();
+		} else {
+			const resolved = await commonDirResult;
+			commonDir =
+				typeof resolved === "string"
+					? resolved.trim()
+					: resolved !== null && resolved !== undefined
+						? String(resolved).trim()
+						: "";
+		}
+
+		const absoluteCommonDir = resolve(commonDir);
+
+		if (absoluteCommonDir.includes("/.git/worktrees/")) {
+			const worktreesMatch = absoluteCommonDir.match(
+				/^(.+?\/\.git)\/worktrees\/.+$/,
+			);
+			const gitDir = worktreesMatch?.[1];
+			if (gitDir) {
+				return resolve(gitDir, "..");
+			}
+		}
+
+		return resolve(absoluteCommonDir, "..");
+	} catch {
+		return process.cwd();
+	}
+}
 
 /**
  * Get the configured OpenRouter model from environment variable or config file
@@ -193,6 +239,17 @@ export const readyCommand: CommandDefinition & {
 	run: async ({ stderr, stdout, exec, rootDir }: ReadyCommandContext) => {
 		const run = exec ?? $;
 
+		// Determine the correct rootDir for agent state
+		// When running from a worktree, we need to use the main repo directory
+		let agentStateRootDir = rootDir;
+		if (!agentStateRootDir) {
+			try {
+				agentStateRootDir = await getMainRepoDir(run);
+			} catch {
+				agentStateRootDir = process.cwd();
+			}
+		}
+
 		try {
 			// Step 1: Get current branch
 			stdout("🔍 Detecting current branch...");
@@ -200,7 +257,7 @@ export const readyCommand: CommandDefinition & {
 			stdout(`   Branch: ${currentBranch}`);
 
 			// Step 2: Check if we have an agent state
-			const agentState = await readAgentState(currentBranch, rootDir);
+			const agentState = await readAgentState(currentBranch, agentStateRootDir);
 			if (!agentState) {
 				stderr(`⚠️  No agent state found for branch: ${currentBranch}`);
 				stderr(`   The 'ready' command is meant for autonomous subagents.`);
@@ -224,7 +281,7 @@ export const readyCommand: CommandDefinition & {
 
 			// Step 5: Update agent status to "ready"
 			stdout("\n📋 Updating agent status to 'ready'...");
-			await updateAgentStatus(currentBranch, "ready", rootDir);
+			await updateAgentStatus(currentBranch, "ready", agentStateRootDir);
 
 			// Step 6: Success message
 			stdout(`\n✅ Work marked as ready for merge`);

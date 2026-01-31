@@ -5,6 +5,7 @@ import {
 	readAgentState,
 	writeAgentState,
 } from "../utils/agent-state";
+import { getAgentStateRootDir } from "../utils/git-paths";
 import type {
 	CommandContext,
 	CommandDefinition,
@@ -182,8 +183,11 @@ async function writeStatusMessage(
 	const run = exec ?? $;
 
 	try {
+		// Resolve agent state root dir (handles worktrees)
+		const agentStateRoot = await getAgentStateRootDir(rootDir, run);
+		
 		const branch = await getCurrentBranch(run);
-		const state = await readAgentState(branch, rootDir);
+		const state = await readAgentState(branch, agentStateRoot);
 
 		if (!state) {
 			stderr(`No autonomous agent found for branch '${branch}'`);
@@ -195,7 +199,7 @@ async function writeStatusMessage(
 				...state,
 				message,
 			},
-			rootDir,
+			agentStateRoot,
 		);
 
 		stdout(`Status updated for ${branch}`);
@@ -215,7 +219,11 @@ export const statusCommand: CommandDefinition & {
 	description: "Display status of all autonomous agents",
 	usage: "gitterflow status [--write <message>]",
 	run: async (context: StatusCommandContext): Promise<number> => {
-		const { args, stdout, stderr, rootDir } = context;
+		const { args, stdout, stderr, rootDir, exec } = context;
+		const run = exec ?? $;
+
+		// Resolve agent state root dir (handles worktrees)
+		const agentStateRoot = await getAgentStateRootDir(rootDir, run);
 
 		// Check for --write flag first
 		const writeIndex = args.findIndex((a) => a === "--write" || a === "-w");
@@ -228,7 +236,7 @@ export const statusCommand: CommandDefinition & {
 			return writeStatusMessage(message, context);
 		}
 
-		const agents = await listAgentStates(rootDir);
+		const agents = await listAgentStates(agentStateRoot);
 
 		if (agents.length === 0) {
 			stdout("No autonomous agents found.");
