@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "gitterflow",
@@ -12,6 +13,7 @@
         "@types/bun": "latest",
         "lefthook": "^1.13.6",
         "lint-staged": "^16.2.4",
+        "typescript": "^5.9.3",
       },
       "peerDependencies": {
         "typescript": "^5",

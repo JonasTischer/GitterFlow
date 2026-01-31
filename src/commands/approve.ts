@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { getSetting } from "../config";
 import { readAgentState, updateAgentStatus } from "../utils/agent-state";
 import { spawnTerminal } from "../utils/terminal";
@@ -34,11 +34,7 @@ export const approveCommand: CommandDefinition = {
 	description: "Approve a subagent's plan and start execution phase",
 	usage: "gitterflow approve <branch> [--message <feedback>]",
 
-	run: async ({
-		args,
-		stdout,
-		stderr,
-	}: CommandContext): Promise<number> => {
+	run: async ({ args, stdout, stderr }: CommandContext): Promise<number> => {
 		const { branch, message } = parseArgs(args);
 
 		if (!branch) {
@@ -75,7 +71,7 @@ export const approveCommand: CommandDefinition = {
 		]
 			.filter(Boolean)
 			.join("\n");
-		await Bun.write(approvalPath, approvalContent + "\n");
+		await Bun.write(approvalPath, `${approvalContent}\n`);
 
 		// Update status to running
 		await updateAgentStatus(branch, "running");
@@ -101,8 +97,7 @@ Do not deviate from the approved plan without good reason.`;
 
 		// Build the execution command
 		const isClaude =
-			baseAgentCommand === "claude" ||
-			baseAgentCommand.startsWith("claude ");
+			baseAgentCommand === "claude" || baseAgentCommand.startsWith("claude ");
 
 		let agentCommand: string;
 		if (isClaude) {
@@ -126,9 +121,7 @@ Do not deviate from the approved plan without good reason.`;
 			} catch {
 				stdout(`cd ${state.worktree_path}`);
 				stdout(agentCommand);
-				stderr(
-					`⚠️  Could not open terminal. Run the command above manually.`,
-				);
+				stderr(`⚠️  Could not open terminal. Run the command above manually.`);
 			}
 		} else {
 			stdout(`cd ${state.worktree_path || "."}`);

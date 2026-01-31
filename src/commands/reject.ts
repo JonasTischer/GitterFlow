@@ -32,11 +32,7 @@ export const rejectCommand: CommandDefinition = {
 	description: "Reject a subagent's plan with feedback",
 	usage: "gitterflow reject <branch> --message <feedback>",
 
-	run: async ({
-		args,
-		stdout,
-		stderr,
-	}: CommandContext): Promise<number> => {
+	run: async ({ args, stdout, stderr }: CommandContext): Promise<number> => {
 		const { branch, message } = parseArgs(args);
 
 		if (!branch) {
@@ -73,7 +69,7 @@ export const rejectCommand: CommandDefinition = {
 		]
 			.filter(Boolean)
 			.join("\n");
-		await Bun.write(approvalPath, rejectionContent + "\n");
+		await Bun.write(approvalPath, `${rejectionContent}\n`);
 
 		// Write brain feedback if message provided
 		if (message) {
@@ -108,7 +104,9 @@ The agent can:
 		stdout("");
 		stdout("💡 Options:");
 		stdout(`   - Re-plan: Navigate to worktree and run 'gf new --plan-first'`);
-		stdout(`   - Manual: Work directly in the worktree at ${state.worktree_path}`);
+		stdout(
+			`   - Manual: Work directly in the worktree at ${state.worktree_path}`,
+		);
 		stdout(`   - Cleanup: Run 'git worktree remove ${state.worktree_path}'`);
 
 		return 0;

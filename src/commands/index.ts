@@ -12,8 +12,8 @@ import { snapCommand } from "./snap";
 import { spawnCommand } from "./spawn";
 import { startedCommand } from "./started";
 import { statusCommand } from "./status";
-import { watchCommand } from "./watch";
 import type { CommandDefinition } from "./types";
+import { watchCommand } from "./watch";
 
 export const commandMap: Record<string, CommandDefinition> = {
 	help: helpCommand,

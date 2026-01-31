@@ -85,7 +85,8 @@ function sleep(ms: number): Promise<void> {
 export const spawnCommand: CommandDefinition = {
 	name: "spawn",
 	description: "Spawn multiple agents in parallel from a list of tasks",
-	usage: 'gitterflow spawn "task1" "task2" [--plan-first] [--file tasks.txt] [--delay ms]',
+	usage:
+		'gitterflow spawn "task1" "task2" [--plan-first] [--file tasks.txt] [--delay ms]',
 
 	run: async ({ args, stdout, stderr }: CommandContext): Promise<number> => {
 		const { tasks: cliTasks, planFirst, file, delay } = parseArgs(args);
@@ -98,15 +99,15 @@ export const spawnCommand: CommandDefinition = {
 				const fileTasks = await readTasksFromFile(file);
 				tasks = [...tasks, ...fileTasks];
 			} catch (error) {
-				stderr(
-					`❌ ${error instanceof Error ? error.message : String(error)}`,
-				);
+				stderr(`❌ ${error instanceof Error ? error.message : String(error)}`);
 				return 1;
 			}
 		}
 
 		if (tasks.length === 0) {
-			stderr("Usage: gf spawn <task1> <task2> ... [--plan-first] [--file tasks.txt]");
+			stderr(
+				"Usage: gf spawn <task1> <task2> ... [--plan-first] [--file tasks.txt]",
+			);
 			stderr("");
 			stderr("Examples:");
 			stderr('  gf spawn "Add login page" "Add user settings" "Fix bug #123"');
@@ -115,7 +116,9 @@ export const spawnCommand: CommandDefinition = {
 			return 1;
 		}
 
-		stdout(`🚀 Spawning ${tasks.length} agent${tasks.length > 1 ? "s" : ""}...`);
+		stdout(
+			`🚀 Spawning ${tasks.length} agent${tasks.length > 1 ? "s" : ""}...`,
+		);
 		if (planFirst) {
 			stdout("   Mode: plan-first (agents will write plans for approval)");
 		}
@@ -235,7 +238,9 @@ export const spawnCommand: CommandDefinition = {
 
 		// Summary
 		stdout("─".repeat(50));
-		stdout(`✅ Spawned: ${spawned.length} agent${spawned.length !== 1 ? "s" : ""}`);
+		stdout(
+			`✅ Spawned: ${spawned.length} agent${spawned.length !== 1 ? "s" : ""}`,
+		);
 		if (failed.length > 0) {
 			stdout(`❌ Failed: ${failed.length}`);
 		}

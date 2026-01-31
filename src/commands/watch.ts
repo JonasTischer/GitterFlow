@@ -1,4 +1,4 @@
-import { listAgentStates, type AgentState } from "../utils/agent-state";
+import { type AgentState, listAgentStates } from "../utils/agent-state";
 import type { CommandContext, CommandDefinition } from "./types";
 
 /**
@@ -41,10 +41,9 @@ function statusEmoji(status: string): string {
 function formatAgent(agent: AgentState): string {
 	const emoji = statusEmoji(agent.status);
 	const time = formatRelativeTime(agent.started_at);
-	const task = agent.task.length > 40 
-		? agent.task.substring(0, 37) + "..." 
-		: agent.task;
-	
+	const task =
+		agent.task.length > 40 ? `${agent.task.substring(0, 37)}...` : agent.task;
+
 	return `${emoji} ${agent.branch.padEnd(30)} ${agent.status.padEnd(18)} ${task.padEnd(42)} ${time}`;
 }
 
@@ -115,7 +114,9 @@ export const watchCommand: CommandDefinition = {
 				const orderA = statusOrder[a.status] ?? 99;
 				const orderB = statusOrder[b.status] ?? 99;
 				if (orderA !== orderB) return orderA - orderB;
-				return new Date(b.started_at).getTime() - new Date(a.started_at).getTime();
+				return (
+					new Date(b.started_at).getTime() - new Date(a.started_at).getTime()
+				);
 			});
 
 			// Count by status
@@ -128,24 +129,26 @@ export const watchCommand: CommandDefinition = {
 			stdout("GitterFlow Watch");
 			stdout("═".repeat(100));
 			stdout("");
-			
+
 			// Summary line
 			const summary = Object.entries(counts)
 				.map(([status, count]) => `${statusEmoji(status)} ${status}: ${count}`)
 				.join("  │  ");
 			stdout(summary);
 			stdout("");
-			
+
 			// Header
 			stdout("─".repeat(100));
-			stdout(`${"Branch".padEnd(32)} ${"Status".padEnd(18)} ${"Task".padEnd(42)} ${"Started"}`);
+			stdout(
+				`${"Branch".padEnd(32)} ${"Status".padEnd(18)} ${"Task".padEnd(42)} ${"Started"}`,
+			);
 			stdout("─".repeat(100));
-			
+
 			// Agents
 			for (const agent of agents) {
 				stdout(formatAgent(agent));
 			}
-			
+
 			stdout("─".repeat(100));
 			stdout("");
 			if (!once) {
@@ -175,7 +178,7 @@ export const watchCommand: CommandDefinition = {
 
 		// Keep the process alive
 		await new Promise(() => {});
-		
+
 		return 0;
 	},
 };

@@ -239,7 +239,9 @@ Potential issues to watch for
 ## Questions
 Anything needing clarification`;
 
-		flags.push(`--append-system-prompt "${planSystemPrompt.replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`);
+		flags.push(
+			`--append-system-prompt "${planSystemPrompt.replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`,
+		);
 	} else {
 		flags.push("--permission-mode acceptEdits");
 
