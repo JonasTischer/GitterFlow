@@ -260,6 +260,37 @@ gf approve <branch> --message "Looks good, proceed"
 gf reject <branch> --message "Use exponential backoff instead"
 ```
 
+## Headless Mode (CI/Server/Orchestrators)
+
+For server-side orchestrators (like Clawdbot) or CI pipelines where terminal spawning isn't available, use `--headless`:
+
+```bash
+# Returns JSON instead of spawning terminal
+gf new --task "Implement feature" --autonomous --headless
+```
+
+**Output:**
+```json
+{
+  "success": true,
+  "branch": "worktree-calm-fox-123",
+  "worktree": "/path/to/worktree",
+  "baseBranch": "main",
+  "task": "Implement feature",
+  "autonomous": true,
+  "planFirst": false,
+  "agentCommand": "claude --permission-mode acceptEdits \"Implement feature\""
+}
+```
+
+Use this to:
+- Parse worktree path and run your own agent process
+- Integrate with session-based orchestrators (Clawdbot sessions_spawn)
+- Build CI/CD pipelines that spawn parallel agents
+- Create custom automation workflows
+
+The `agentCommand` field shows the exact command that would be run, so you can execute it programmatically.
+
 ## Important Notes
 
 - Sub-agents merge to **your current branch** (the branch you were on when spawning)
@@ -268,3 +299,4 @@ gf reject <branch> --message "Use exponential backoff instead"
 - Keep tasks independent to avoid merge conflicts
 - Brain agents should handle ALL merges - sub-agents should only use `gf ready`
 - **Plan mode** prevents wasted work by validating approach before implementation
+- **Headless mode** enables server-side orchestration without terminals
