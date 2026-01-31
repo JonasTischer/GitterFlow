@@ -516,7 +516,7 @@ describe("new command", () => {
 			// The command output should use --append-system-prompt with finish reminder
 			const taskOutput = stdoutMessages.find((msg) => msg.includes("claude"));
 			expect(taskOutput).toContain("--append-system-prompt");
-			expect(taskOutput).toContain("gitterflow skill");
+			expect(taskOutput).toContain("gf finish");
 		});
 
 		test("should not write agent state without --autonomous flag", async () => {
@@ -695,6 +695,127 @@ describe("new command", () => {
 			const output = JSON.parse(stdoutMessages[0] ?? "{}");
 			expect(output.success).toBe(true);
 			expect(output.branch).toMatch(/^worktree-\w+-\w+-\d+$/);
+		});
+	});
+
+	describe("spawn mode (--spawn flag)", () => {
+		const testDir = join(import.meta.dir, ".test-new-spawn-tmp");
+
+		beforeEach(async () => {
+			await mkdir(testDir, { recursive: true });
+		});
+
+		afterEach(async () => {
+			await rm(testDir, { recursive: true, force: true });
+		});
+
+		test("should imply --headless and --autonomous when --spawn is used", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-spawn", "--spawn", "--task", "Test spawn"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			// Should output JSON (headless implied)
+			expect(stdoutMessages).toHaveLength(1);
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.success).toBe(true);
+			expect(output.spawn).toBe(true);
+			expect(output.autonomous).toBe(true);
+		});
+
+		test("should include -p flag in agentCommand for spawn mode", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-spawn-p", "--spawn", "--task", "Test"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.agentCommand).toContain("claude -p");
+		});
+
+		test("should include --allowedTools in agentCommand for spawn mode", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-spawn-tools", "--spawn", "--task", "Test"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.agentCommand).toContain("--allowedTools");
+		});
+
+		test("should use custom --allowed-tools when provided", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-custom-tools", "--spawn", "--task", "Test", "--allowed-tools", "Read,Bash"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.agentCommand).toContain("Read,Bash");
+		});
+
+		test("should support -s shorthand for --spawn", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-spawn-short", "-s", "--task", "Test"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.spawn).toBe(true);
+		});
+
+		test("should track parent branch when --parent is provided", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-child", "--spawn", "--task", "Child task", "--parent", "feature-parent"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.parent).toBe("feature-parent");
+		});
+
+		test("should set status to running for spawned agents", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-spawn-status", "--spawn", "--task", "Test"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const state = await readAgentState("feature-spawn-status", testDir);
+			expect(state?.status).toBe("running");
 		});
 	});
 });

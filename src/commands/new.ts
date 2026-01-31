@@ -1,7 +1,8 @@
 import { resolve } from "node:path";
+import { spawn } from "node:child_process";
 import { $ } from "bun";
 import { getSetting } from "../config";
-import { writeAgentState } from "../utils/agent-state";
+import { readAgentState, writeAgentState, updateAgentStatus } from "../utils/agent-state";
 import { preTrustWorktree } from "../utils/claude-trust";
 import { createSymlinks } from "../utils/symlink";
 import { spawnTerminal } from "../utils/terminal";
@@ -140,11 +141,14 @@ async function promptUncommittedChanges(
 
 /**
  * Parse command line arguments
- * Returns { branch, task, force, autonomous, planFirst, headless }
+ * Returns { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, parent }
  * --force or -f: auto-create WIP commit if uncommitted changes exist
  * --autonomous or -a: track agent state and instruct to run gf finish
  * --plan-first or -p: start in plan mode, require brain approval before execution
  * --headless or -H: skip terminal/IDE spawning, output JSON (for CI/server/orchestrators)
+ * --spawn or -s: actually spawn claude -p in background (implies --headless --autonomous)
+ * --allowed-tools: comma-separated list of tools to pre-approve (default: Read,Edit,Write,Bash,Grep,Glob)
+ * --parent: parent branch name (for recursive sub-agent tracking)
  */
 function parseArgs(args: string[]): {
 	branch?: string;
@@ -153,6 +157,9 @@ function parseArgs(args: string[]): {
 	autonomous?: boolean;
 	planFirst?: boolean;
 	headless?: boolean;
+	spawn?: boolean;
+	allowedTools?: string;
+	parent?: string;
 } {
 	let branch: string | undefined;
 	let task: string | undefined;
@@ -160,13 +167,15 @@ function parseArgs(args: string[]): {
 	let autonomous = false;
 	let planFirst = false;
 	let headless = false;
+	let spawn = false;
+	let allowedTools: string | undefined;
+	let parent: string | undefined;
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i] ?? "";
 		if (arg === "--task" || arg === "-t") {
-			// Next argument is the task
 			task = args[i + 1];
-			i++; // Skip the task value
+			i++;
 		} else if (arg === "--force" || arg === "-f") {
 			force = true;
 		} else if (arg === "--autonomous" || arg === "-a") {
@@ -175,16 +184,31 @@ function parseArgs(args: string[]): {
 			planFirst = true;
 		} else if (arg === "--headless" || arg === "-H") {
 			headless = true;
+		} else if (arg === "--spawn" || arg === "-s") {
+			spawn = true;
+			headless = true; // spawn implies headless
+			autonomous = true; // spawn implies autonomous
+		} else if (arg === "--allowed-tools") {
+			allowedTools = args[i + 1];
+			i++;
+		} else if (arg === "--parent") {
+			parent = args[i + 1];
+			i++;
 		} else if (!arg.startsWith("-")) {
-			// Non-flag argument is the branch name
 			if (!branch) {
 				branch = arg;
 			}
 		}
 	}
 
-	return { branch, task, force, autonomous, planFirst, headless };
+	return { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, parent };
 }
+
+/**
+ * Default tools to allow for autonomous agents
+ * These cover most common development tasks
+ */
+const DEFAULT_ALLOWED_TOOLS = "Read,Edit,Write,Bash,Grep,Glob,WebSearch,WebFetch";
 
 /**
  * Build the agent command with optional task
@@ -193,11 +217,19 @@ function parseArgs(args: string[]): {
  *   --permission-mode acceptEdits to auto-accept edits (normal mode)
  *   --permission-mode plan for plan-first mode (read-only analysis)
  *   --append-system-prompt with finish instruction (when autonomous)
+ *   --allowedTools for headless execution (when spawn mode)
+ *   -p for print/headless mode (when spawn mode)
  */
 function buildAgentCommand(
 	baseCommand: string,
 	task?: string,
-	options?: { autonomous?: boolean; planFirst?: boolean; branch?: string },
+	options?: { 
+		autonomous?: boolean; 
+		planFirst?: boolean; 
+		branch?: string;
+		spawn?: boolean;
+		allowedTools?: string;
+	},
 ): string {
 	// For claude, add permission mode flag
 	const isClaude =
@@ -253,9 +285,16 @@ Anything needing clarification`;
 		// Add system prompt for autonomous mode
 		if (options?.autonomous) {
 			const systemPrompt =
-				"When you complete this task, use the gitterflow skill to finish and merge your changes back to the base branch.";
+				"When you complete this task, run 'gf finish' to merge your changes back to the base branch. You can also spawn sub-agents using 'gf new --spawn --task \"subtask\"' for parallel work.";
 			flags.push(`--append-system-prompt "${systemPrompt}"`);
 		}
+	}
+
+	// For spawn mode, add -p flag and allowedTools
+	if (options?.spawn) {
+		flags.unshift("-p"); // Add print/headless mode flag at the start
+		const tools = options.allowedTools || DEFAULT_ALLOWED_TOOLS;
+		flags.push(`--allowedTools "${tools}"`);
 	}
 
 	// Build final command
@@ -311,10 +350,10 @@ export const newCommand: CommandDefinition & {
 	description:
 		"Create a git worktree (optionally specify branch name and task)",
 	usage:
-		"gitterflow new [branch] [--task <prompt>] [--force] [--autonomous] [--plan-first] [--headless]",
+		"gitterflow new [branch] [--task <prompt>] [--force] [--autonomous] [--plan-first] [--headless] [--spawn] [--parent <branch>] [--allowed-tools <tools>]",
 	run: async ({ args, stderr, stdout, exec, rootDir }: NewCommandContext) => {
-		// Parse arguments for branch name, task, force, autonomous, planFirst, and headless flags
-		const { branch, task, force, autonomous, planFirst, headless } =
+		// Parse arguments for branch name, task, force, autonomous, planFirst, headless, spawn, etc.
+		const { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, parent } =
 			parseArgs(args);
 
 		// --plan-first mode: agent analyzes and writes plan, then waits for approval
@@ -421,16 +460,31 @@ export const newCommand: CommandDefinition & {
 				const planPath = planFirst
 					? `.gitterflow/agents/${trimmedBranch}/plan.md`
 					: undefined;
+				
+				// Calculate depth based on parent
+				let depth = 0;
+				if (parent) {
+					// Try to read parent's depth
+					try {
+						const parentState = await readAgentState(parent, rootDir);
+						depth = (parentState?.depth ?? 0) + 1;
+					} catch {
+						depth = 1; // Default to 1 if parent state not found
+					}
+				}
+				
 				await writeAgentState(
 					{
 						branch: trimmedBranch,
 						task: task ?? "No task specified",
-						status: "pending",
+						status: spawn ? "running" : "pending",
 						started_at: now,
 						spawned_at: now,
 						worktree_path: absoluteWorktreePath,
 						base_branch: currentBranch,
 						plan_file: planPath,
+						parent_branch: parent,
+						depth,
 					},
 					rootDir,
 				);
@@ -442,7 +496,62 @@ export const newCommand: CommandDefinition & {
 				autonomous,
 				planFirst,
 				branch: trimmedBranch,
+				spawn,
+				allowedTools,
 			});
+
+			// Spawn mode: actually run claude -p in background
+			if (spawn) {
+				let pid: number | undefined;
+				
+				// Skip actual spawning in test environment
+				const isTest = process.env.CI === "true" || process.env.NODE_ENV === "test";
+				
+				if (!isTest) {
+					// Build the full command to run in the worktree
+					const fullCommand = `cd "${absoluteWorktreePath}" && ${agentCommand}`;
+					
+					// Spawn the process in background
+					const child = spawn("bash", ["-c", fullCommand], {
+						detached: true,
+						stdio: "ignore",
+						cwd: absoluteWorktreePath,
+					});
+					
+					// Unref so parent can exit
+					child.unref();
+					pid = child.pid;
+					
+					// Update agent state with PID
+					if (autonomous || planFirst) {
+						try {
+							const state = await readAgentState(trimmedBranch, rootDir);
+							if (state && pid) {
+								await writeAgentState({ ...state, pid }, rootDir);
+							}
+						} catch {
+							// Ignore errors updating PID
+						}
+					}
+				}
+				
+				// Output JSON result
+				const result = {
+					success: true,
+					branch: trimmedBranch,
+					worktree: absoluteWorktreePath,
+					baseBranch: currentBranch,
+					task: task ?? null,
+					autonomous,
+					planFirst,
+					spawn: true,
+					pid: pid ?? null,
+					agentCommand,
+					parent: parent ?? null,
+				};
+				stdout(JSON.stringify(result));
+				return 0;
+			}
 
 			// Headless mode: output JSON and exit (no terminal/IDE spawning)
 			// Useful for CI/CD pipelines, server-side orchestrators, and Clawdbot integration
@@ -456,6 +565,7 @@ export const newCommand: CommandDefinition & {
 					autonomous,
 					planFirst,
 					agentCommand,
+					parent: parent ?? null,
 				};
 				stdout(JSON.stringify(result));
 				return 0;

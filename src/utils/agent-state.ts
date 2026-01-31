@@ -51,6 +51,12 @@ export interface AgentState {
 	message?: string;
 	/** Path to the plan file (for awaiting_approval status) */
 	plan_file?: string;
+	/** Parent branch name (for recursive sub-agent tracking) */
+	parent_branch?: string;
+	/** Nesting depth (0 = brain, 1 = direct sub-agent, 2+ = recursive) */
+	depth?: number;
+	/** Process ID if spawned in background */
+	pid?: number;
 }
 
 /**

@@ -226,6 +226,14 @@ Creates a new git worktree with an optional branch name. If no branch name is pr
   gf new --task "Add feature" --autonomous --headless
   # Output: {"success":true,"branch":"worktree-calm-fox-123","worktree":"/path/to/worktree",...}
   ```
+- `--spawn` or `-s` - Spawn `claude -p` in background (implies --headless --autonomous)
+  ```bash
+  # Spawns Claude Code CLI headlessly and returns immediately
+  gf new --spawn --task "Implement auth module"
+  # Agent runs in background - use `gf status` to monitor
+  ```
+- `--parent <branch>` - Track parent branch for recursive sub-agent spawning
+- `--allowed-tools <tools>` - Comma-separated tools to pre-approve for spawn mode
 
 ### `gitterflow list`
 
