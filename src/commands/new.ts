@@ -185,13 +185,14 @@ function parseArgs(args: string[]): {
  * Build the agent command with optional task
  * If task is provided, appends it as an initial prompt: claude "task"
  * For Claude, adds:
- *   --permission-mode acceptEdits to auto-accept edits
+ *   --permission-mode acceptEdits to auto-accept edits (normal mode)
+ *   --permission-mode plan for plan-first mode (read-only analysis)
  *   --append-system-prompt with finish instruction (when autonomous)
  */
 function buildAgentCommand(
 	baseCommand: string,
 	task?: string,
-	options?: { autonomous?: boolean },
+	options?: { autonomous?: boolean; planFirst?: boolean; branch?: string },
 ): string {
 	// For claude, add permission mode flag
 	const isClaude =
@@ -205,13 +206,49 @@ function buildAgentCommand(
 	}
 
 	// Build Claude command with flags
-	const flags = ["--permission-mode acceptEdits"];
+	const flags: string[] = [];
 
-	// Add system prompt for autonomous mode
-	if (options?.autonomous) {
-		const systemPrompt =
-			"When you complete this task, use the gitterflow skill to finish and merge your changes back to the base branch.";
-		flags.push(`--append-system-prompt "${systemPrompt}"`);
+	if (options?.planFirst) {
+		// Plan mode: read-only analysis, write plan, then exit
+		flags.push("--permission-mode plan");
+
+		const planPath = `.gitterflow/agents/${options.branch || "agent"}/plan.md`;
+		const planSystemPrompt = `You are in PLAN mode. Your task:
+
+1. Analyze the codebase to understand what needs to be done
+2. Write a detailed implementation plan to: ${planPath}
+3. Run: gf status --write "awaiting_approval"
+4. Exit immediately (do not implement anything)
+
+Plan format:
+## Analysis
+What you found in the codebase
+
+## Approach
+How you'll implement the task
+
+## Files to Modify
+List of files and changes needed
+
+## Files to Create
+New files if needed
+
+## Risks
+Potential issues to watch for
+
+## Questions
+Anything needing clarification`;
+
+		flags.push(`--append-system-prompt "${planSystemPrompt.replace(/"/g, '\\"').replace(/\n/g, "\\n")}"`);
+	} else {
+		flags.push("--permission-mode acceptEdits");
+
+		// Add system prompt for autonomous mode
+		if (options?.autonomous) {
+			const systemPrompt =
+				"When you complete this task, use the gitterflow skill to finish and merge your changes back to the base branch.";
+			flags.push(`--append-system-prompt "${systemPrompt}"`);
+		}
 	}
 
 	// Build final command
@@ -272,19 +309,9 @@ export const newCommand: CommandDefinition & {
 		// Parse arguments for branch name, task, force, autonomous, and planFirst flags
 		const { branch, task, force, autonomous, planFirst } = parseArgs(args);
 
-		// TODO: Implement --plan-first workflow (Issue 6)
-		// When planFirst is true:
-		// 1. Start claude with --permission-mode plan
-		// 2. Add system prompt for writing plan file
-		// 3. Set initial status to "pending", update to "awaiting_approval" when plan written
-		// 4. Brain uses "gf approve" or "gf reject" to control execution
+		// --plan-first mode: agent analyzes and writes plan, then waits for approval
+		// Brain reviews plan, uses "gf approve" or "gf reject" to control execution
 		// See docs/PLAN-APPROVAL-DESIGN.md for full design
-		if (planFirst) {
-			stdout(
-				"⚠️  --plan-first is not yet implemented. See docs/PLAN-APPROVAL-DESIGN.md",
-			);
-			stdout("   Falling back to normal autonomous mode.");
-		}
 		const run = exec ?? $;
 
 		// Check for uncommitted changes
@@ -380,9 +407,12 @@ export const newCommand: CommandDefinition & {
 				// User will just see the trust dialog once
 			}
 
-			// Write initial agent state if autonomous mode
-			if (autonomous) {
+			// Write initial agent state if autonomous or plan-first mode
+			if (autonomous || planFirst) {
 				const now = new Date().toISOString();
+				const planPath = planFirst
+					? `.gitterflow/agents/${trimmedBranch}/plan.md`
+					: undefined;
 				await writeAgentState(
 					{
 						branch: trimmedBranch,
@@ -392,6 +422,7 @@ export const newCommand: CommandDefinition & {
 						spawned_at: now,
 						worktree_path: absoluteWorktreePath,
 						base_branch: currentBranch,
+						plan_file: planPath,
 					},
 					rootDir,
 				);
@@ -411,6 +442,8 @@ export const newCommand: CommandDefinition & {
 					const baseAgentCommand = getSetting("coding_agent");
 					const agentCommand = buildAgentCommand(baseAgentCommand, task, {
 						autonomous,
+						planFirst,
+						branch: trimmedBranch,
 					});
 					const ide = getSetting("ide");
 					const openTerminal = getSetting("open_terminal");
@@ -436,6 +469,8 @@ export const newCommand: CommandDefinition & {
 					const baseAgentCommand = getSetting("coding_agent");
 					const agentCommand = buildAgentCommand(baseAgentCommand, task, {
 						autonomous,
+						planFirst,
+						branch: trimmedBranch,
 					});
 					stdout(`cd ${absoluteWorktreePath}`);
 					stdout(`${agentCommand}`);
@@ -448,6 +483,8 @@ export const newCommand: CommandDefinition & {
 				const baseAgentCommand = getSetting("coding_agent");
 				const agentCommand = buildAgentCommand(baseAgentCommand, task, {
 					autonomous,
+					planFirst,
+					branch: trimmedBranch,
 				});
 				stdout(`cd ${absoluteWorktreePath}`);
 				stdout(`${agentCommand}`);

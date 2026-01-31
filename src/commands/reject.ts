@@ -1,27 +1,13 @@
-/**
- * gf reject - Reject a subagent's plan with feedback
- *
- * Part of the plan-then-execute workflow (Issue 6).
- * See docs/PLAN-APPROVAL-DESIGN.md for full design.
- *
- * Usage:
- *   gf reject <branch> --message <feedback>
- *
- * What this command will do when fully implemented:
- * 1. Validate agent is in "awaiting_approval" status
- * 2. Write rejection marker with feedback to agent workspace
- * 3. Write brain feedback to .gitterflow/agents/{branch}/brain-feedback.md
- * 4. Update agent status to "failed" (or a new "rejected" status)
- * 5. Leave worktree intact for potential re-planning
- */
-
-import { readAgentState } from "../utils/agent-state";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { readAgentState, updateAgentStatus } from "../utils/agent-state";
 import type { CommandContext, CommandDefinition } from "./types";
 
 /**
- * Parse reject command arguments
+ * Parse command line arguments
+ * Returns { branch, message }
  */
-function parseRejectArgs(args: string[]): {
+function parseArgs(args: string[]): {
 	branch?: string;
 	message?: string;
 } {
@@ -32,11 +18,9 @@ function parseRejectArgs(args: string[]): {
 		const arg = args[i] ?? "";
 		if (arg === "--message" || arg === "-m") {
 			message = args[i + 1];
-			i++;
-		} else if (!arg.startsWith("-")) {
-			if (!branch) {
-				branch = arg;
-			}
+			i++; // Skip the message value
+		} else if (!arg.startsWith("-") && !branch) {
+			branch = arg;
 		}
 	}
 
@@ -48,61 +32,84 @@ export const rejectCommand: CommandDefinition = {
 	description: "Reject a subagent's plan with feedback",
 	usage: "gitterflow reject <branch> --message <feedback>",
 
-	run: async ({ args, stdout, stderr }: CommandContext): Promise<number> => {
-		const { branch, message } = parseRejectArgs(args);
+	run: async ({
+		args,
+		stdout,
+		stderr,
+	}: CommandContext): Promise<number> => {
+		const { branch, message } = parseArgs(args);
 
 		if (!branch) {
 			stderr("Usage: gf reject <branch> --message <feedback>");
-			stderr("");
-			stderr("Reject a subagent's implementation plan and provide feedback.");
-			stderr("The agent must be in 'awaiting_approval' status.");
+			stderr("  Reject an agent's plan and provide feedback");
 			return 1;
 		}
 
-		if (!message) {
-			stderr("❌ Please provide feedback with --message <feedback>");
-			stderr("");
-			stderr(
-				"   Feedback helps the agent understand why the plan was rejected",
-			);
-			stderr("   and what changes are needed for re-planning.");
-			return 1;
-		}
-
-		// Check if agent exists
+		// Read agent state
 		const state = await readAgentState(branch);
 		if (!state) {
 			stderr(`❌ No agent found for branch: ${branch}`);
-			stderr("   Run 'gf status' to see available agents.");
 			return 1;
 		}
 
-		// Validate status
 		if (state.status !== "awaiting_approval") {
 			stderr(
 				`❌ Agent is not awaiting approval (current status: ${state.status})`,
 			);
-			stderr("");
-			stderr("   Only agents with status 'awaiting_approval' can be rejected.");
+			stderr("   Only agents in 'awaiting_approval' status can be rejected.");
 			return 1;
 		}
 
-		// TODO: Implement full rejection workflow
-		// 1. Write rejection marker: .gitterflow/agents/{branch}/approval.yaml
-		// 2. Write feedback: .gitterflow/agents/{branch}/brain-feedback.md
-		// 3. Update agent status to "failed" with error message
-		// See docs/PLAN-APPROVAL-DESIGN.md for implementation details
+		// Ensure the agent workspace directory exists
+		const agentDir = join(".gitterflow", "agents", branch);
+		await mkdir(agentDir, { recursive: true });
 
-		stdout("⚠️  gf reject is not yet fully implemented.");
-		stdout("   See docs/PLAN-APPROVAL-DESIGN.md for the planned workflow.");
+		// Write rejection marker
+		const approvalPath = join(agentDir, "approval.yaml");
+		const rejectionContent = [
+			"approved: false",
+			`rejected_at: ${new Date().toISOString()}`,
+			message ? `reason: "${message.replace(/"/g, '\\"')}"` : "",
+		]
+			.filter(Boolean)
+			.join("\n");
+		await Bun.write(approvalPath, rejectionContent + "\n");
+
+		// Write brain feedback if message provided
+		if (message) {
+			const feedbackPath = join(agentDir, "brain-feedback.md");
+			const feedbackContent = `# Brain Feedback
+
+Rejected at: ${new Date().toISOString()}
+
+## Feedback
+
+${message}
+
+## Next Steps
+
+The agent can:
+1. Re-analyze and create a new plan addressing the feedback
+2. Ask clarifying questions before re-planning
+3. The worktree remains available for manual work if needed
+`;
+			await Bun.write(feedbackPath, feedbackContent);
+		}
+
+		// Update status to failed with rejection reason
+		await updateAgentStatus(branch, "failed", {
+			error: message ? `Plan rejected: ${message}` : "Plan rejected by brain",
+		});
+
+		stdout(`❌ Rejected plan for ${branch}`);
+		if (message) {
+			stdout(`📝 Feedback: ${message}`);
+		}
 		stdout("");
-		stdout(`   Would reject plan for: ${branch}`);
-		stdout(`   With feedback: ${message}`);
-		stdout("");
-		stdout("   After rejection, options would be:");
-		stdout("   1. Re-plan in the same worktree with updated task");
-		stdout("   2. Delete the worktree and spawn a new agent");
-		stdout("   3. Manually fix the plan and re-approve");
+		stdout("💡 Options:");
+		stdout(`   - Re-plan: Navigate to worktree and run 'gf new --plan-first'`);
+		stdout(`   - Manual: Work directly in the worktree at ${state.worktree_path}`);
+		stdout(`   - Cleanup: Run 'git worktree remove ${state.worktree_path}'`);
 
 		return 0;
 	},

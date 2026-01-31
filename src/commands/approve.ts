@@ -1,27 +1,15 @@
-/**
- * gf approve - Approve a subagent's plan and start execution phase
- *
- * Part of the plan-then-execute workflow (Issue 6).
- * See docs/PLAN-APPROVAL-DESIGN.md for full design.
- *
- * Usage:
- *   gf approve <branch> [--message <feedback>]
- *
- * What this command will do when fully implemented:
- * 1. Validate agent is in "awaiting_approval" status
- * 2. Read and validate the plan file exists
- * 3. Write approval marker to agent workspace
- * 4. Update agent status to "running"
- * 5. Spawn execution phase with full permissions
- */
-
-import { readAgentState } from "../utils/agent-state";
+import { mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { getSetting } from "../config";
+import { readAgentState, updateAgentStatus } from "../utils/agent-state";
+import { spawnTerminal } from "../utils/terminal";
 import type { CommandContext, CommandDefinition } from "./types";
 
 /**
- * Parse approve command arguments
+ * Parse command line arguments
+ * Returns { branch, message }
  */
-function parseApproveArgs(args: string[]): {
+function parseArgs(args: string[]): {
 	branch?: string;
 	message?: string;
 } {
@@ -32,11 +20,9 @@ function parseApproveArgs(args: string[]): {
 		const arg = args[i] ?? "";
 		if (arg === "--message" || arg === "-m") {
 			message = args[i + 1];
-			i++;
-		} else if (!arg.startsWith("-")) {
-			if (!branch) {
-				branch = arg;
-			}
+			i++; // Skip the message value
+		} else if (!arg.startsWith("-") && !branch) {
+			branch = arg;
 		}
 	}
 
@@ -48,54 +34,105 @@ export const approveCommand: CommandDefinition = {
 	description: "Approve a subagent's plan and start execution phase",
 	usage: "gitterflow approve <branch> [--message <feedback>]",
 
-	run: async ({ args, stdout, stderr }: CommandContext): Promise<number> => {
-		const { branch, message } = parseApproveArgs(args);
+	run: async ({
+		args,
+		stdout,
+		stderr,
+	}: CommandContext): Promise<number> => {
+		const { branch, message } = parseArgs(args);
 
 		if (!branch) {
-			stderr("Usage: gf approve <branch> [--message <feedback>]");
-			stderr("");
-			stderr(
-				"Approve a subagent's implementation plan and spawn execution phase.",
-			);
-			stderr("The agent must be in 'awaiting_approval' status.");
+			stderr("Usage: gf approve <branch>");
+			stderr("  Approve an agent's plan and start execution phase");
 			return 1;
 		}
 
-		// Check if agent exists
+		// Read agent state
 		const state = await readAgentState(branch);
 		if (!state) {
 			stderr(`❌ No agent found for branch: ${branch}`);
-			stderr("   Run 'gf status' to see available agents.");
 			return 1;
 		}
 
-		// Validate status
 		if (state.status !== "awaiting_approval") {
 			stderr(
 				`❌ Agent is not awaiting approval (current status: ${state.status})`,
 			);
-			stderr("");
-			stderr("   Only agents with status 'awaiting_approval' can be approved.");
-			stderr("   This status is set when an agent spawned with --plan-first");
-			stderr("   completes its planning phase.");
+			stderr("   Only agents in 'awaiting_approval' status can be approved.");
 			return 1;
 		}
 
-		// TODO: Implement full approval workflow
-		// 1. Write approval marker: .gitterflow/agents/{branch}/approval.yaml
-		// 2. Update agent status to "running"
-		// 3. Spawn execution phase in the worktree
-		// See docs/PLAN-APPROVAL-DESIGN.md for implementation details
+		// Ensure the agent workspace directory exists
+		const agentDir = join(".gitterflow", "agents", branch);
+		await mkdir(agentDir, { recursive: true });
 
-		stdout("⚠️  gf approve is not yet fully implemented.");
-		stdout("   See docs/PLAN-APPROVAL-DESIGN.md for the planned workflow.");
-		stdout("");
-		stdout(`   Would approve plan for: ${branch}`);
-		if (state.plan_file) {
-			stdout(`   Plan file: ${state.plan_file}`);
-		}
+		// Write approval marker
+		const approvalPath = join(agentDir, "approval.yaml");
+		const approvalContent = [
+			"approved: true",
+			`approved_at: ${new Date().toISOString()}`,
+			message ? `message: "${message}"` : "",
+		]
+			.filter(Boolean)
+			.join("\n");
+		await Bun.write(approvalPath, approvalContent + "\n");
+
+		// Update status to running
+		await updateAgentStatus(branch, "running");
+
+		stdout(`✅ Approved plan for ${branch}`);
 		if (message) {
-			stdout(`   With message: ${message}`);
+			stdout(`📝 Feedback: ${message}`);
+		}
+		stdout(`📍 Spawning execution phase...`);
+
+		// Spawn execution phase in the worktree
+		const baseAgentCommand = getSetting("coding_agent");
+		const planPath = state.plan_file || `.gitterflow/agents/${branch}/plan.md`;
+
+		const executionPrompt = `Execute the approved plan.
+
+Read the plan file at: ${planPath}
+Implement exactly what was planned.
+
+When complete, run: gf finish
+
+Do not deviate from the approved plan without good reason.`;
+
+		// Build the execution command
+		const isClaude =
+			baseAgentCommand === "claude" ||
+			baseAgentCommand.startsWith("claude ");
+
+		let agentCommand: string;
+		if (isClaude) {
+			const systemPrompt =
+				"When you complete this task, use the gitterflow skill to finish and merge your changes back to the base branch.";
+			const escapedPrompt = executionPrompt.replace(/"/g, '\\"');
+			agentCommand = `claude --permission-mode acceptEdits --append-system-prompt "${systemPrompt}" "${escapedPrompt}"`;
+		} else {
+			const escapedPrompt = executionPrompt.replace(/"/g, '\\"');
+			agentCommand = `${baseAgentCommand} "${escapedPrompt}"`;
+		}
+
+		// Skip terminal spawning in CI/test environments
+		const skipTerminalSpawn =
+			process.env.CI === "true" || process.env.NODE_ENV === "test";
+
+		if (!skipTerminalSpawn && state.worktree_path) {
+			try {
+				spawnTerminal(state.worktree_path, agentCommand);
+				stdout(`🚀 Execution phase started for ${branch}`);
+			} catch {
+				stdout(`cd ${state.worktree_path}`);
+				stdout(agentCommand);
+				stderr(
+					`⚠️  Could not open terminal. Run the command above manually.`,
+				);
+			}
+		} else {
+			stdout(`cd ${state.worktree_path || "."}`);
+			stdout(agentCommand);
 		}
 
 		return 0;

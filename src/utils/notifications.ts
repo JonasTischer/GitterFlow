@@ -1,4 +1,4 @@
-import { getSetting } from "../config";
+import { getNotificationSetting } from "../config";
 
 export interface AgentEvent {
 	type: "started" | "ready" | "completed" | "failed" | "approved" | "rejected";
@@ -16,7 +16,7 @@ export interface AgentEvent {
  */
 export async function notifyWebhook(event: AgentEvent): Promise<void> {
 	try {
-		const webhookUrl = getSetting("webhook_url");
+		const webhookUrl = getNotificationSetting("webhook_url");
 		if (!webhookUrl) return;
 
 		await fetch(webhookUrl, {
