@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { $ } from "bun";
 import { getSetting } from "../config";
 import { readAgentState, updateAgentStatus } from "../utils/agent-state";
+import { notify } from "../utils/notifications";
 import type {
 	CommandContext,
 	CommandDefinition,
@@ -862,6 +863,20 @@ export const finishCommand: CommandDefinition & {
 			stdout(`   Merged into: ${baseBranch}`);
 			stdout(`   To push: git push origin ${baseBranch}`);
 
+			// Send completion notification
+			try {
+				const agentState = await readAgentState(currentBranch, rootDir);
+				await notify({
+					type: "completed",
+					branch: currentBranch,
+					task: agentState?.task,
+					baseBranch: baseBranch,
+					timestamp: new Date().toISOString(),
+				});
+			} catch {
+				// Ignore notification errors
+			}
+
 			return 0;
 		} catch (error) {
 			const errorMessage =
@@ -876,6 +891,15 @@ export const finishCommand: CommandDefinition & {
 							error: errorMessage,
 						});
 					}
+
+					// Send failure notification
+					await notify({
+						type: "failed",
+						branch: currentBranch,
+						task: agentState?.task,
+						timestamp: new Date().toISOString(),
+						details: { error: errorMessage },
+					});
 				} catch {
 					// Ignore errors
 				}

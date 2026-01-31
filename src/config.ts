@@ -2,6 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import YAML from "yaml";
 
+export interface NotificationsConfig {
+	webhook_url: string | null;
+	clawdbot: boolean;
+}
+
 export interface GitterflowConfig {
 	base_branch: string;
 	worktrees_dir: string;
@@ -12,6 +17,7 @@ export interface GitterflowConfig {
 	terminal: string;
 	ide: string | null;
 	symlink_files: string[];
+	notifications: NotificationsConfig;
 }
 
 let cachedConfig: GitterflowConfig | null = null;
@@ -32,6 +38,10 @@ export function loadConfig(): GitterflowConfig {
 			terminal: "iterm",
 			ide: null,
 			symlink_files: [".claude"],
+			notifications: {
+				webhook_url: null,
+				clawdbot: true,
+			},
 		};
 		return cachedConfig;
 	}
@@ -50,6 +60,10 @@ export function loadConfig(): GitterflowConfig {
 		terminal: parsed.terminal ?? "iterm",
 		ide: parsed.ide ?? null,
 		symlink_files: parsed.symlink_files ?? [".claude"],
+		notifications: {
+			webhook_url: parsed.notifications?.webhook_url ?? null,
+			clawdbot: parsed.notifications?.clawdbot ?? true,
+		},
 	};
 
 	return cachedConfig;
@@ -60,6 +74,16 @@ export function getSetting<K extends keyof GitterflowConfig>(
 ): GitterflowConfig[K] {
 	const cfg = loadConfig();
 	return cfg[key];
+}
+
+/**
+ * Get a notification setting
+ */
+export function getNotificationSetting<K extends keyof NotificationsConfig>(
+	key: K,
+): NotificationsConfig[K] {
+	const cfg = loadConfig();
+	return cfg.notifications[key];
 }
 
 /**
