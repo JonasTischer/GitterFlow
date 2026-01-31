@@ -23,3 +23,4 @@
 - [13:20] Created gf approve command
 - [13:20] Created gf reject command
 - [13:20] Fixed notifications to use getNotificationSetting
+- [20:20] Implemented gf watch for live monitoring

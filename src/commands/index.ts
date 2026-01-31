@@ -12,6 +12,7 @@ import { snapCommand } from "./snap";
 import { spawnCommand } from "./spawn";
 import { startedCommand } from "./started";
 import { statusCommand } from "./status";
+import { watchCommand } from "./watch";
 import type { CommandDefinition } from "./types";
 
 export const commandMap: Record<string, CommandDefinition> = {
@@ -29,6 +30,7 @@ export const commandMap: Record<string, CommandDefinition> = {
 	"mark-failed": markFailedCommand,
 	approve: approveCommand,
 	reject: rejectCommand,
+	watch: watchCommand,
 };
 
 for (const definition of Object.values(commandMap)) {
@@ -44,6 +46,7 @@ export const orderedCommands: CommandDefinition[] = [
 	spawnCommand,
 	listCommand,
 	statusCommand,
+	watchCommand,
 	approveCommand,
 	rejectCommand,
 	deleteCommand,
