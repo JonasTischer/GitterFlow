@@ -548,6 +548,18 @@ export const finishCommand: CommandDefinition & {
 	run: async ({ stderr, stdout, exec, rootDir }: FinishCommandContext) => {
 		const run = exec ?? $;
 		let currentBranch = "";
+		
+		// Determine the correct rootDir for agent state
+		// When running from a worktree, we need to use the main repo directory
+		// because that's where .gitterflow/agents/ lives
+		let agentStateRootDir = rootDir;
+		if (!agentStateRootDir) {
+			try {
+				agentStateRootDir = await getMainRepoDir(run);
+			} catch {
+				agentStateRootDir = process.cwd();
+			}
+		}
 
 		try {
 			// Step 1: Get current branch and worktree path (before checkout)
@@ -709,7 +721,7 @@ export const finishCommand: CommandDefinition & {
 				// Read agent state to get task description for merge message
 				let mergeMessage: string;
 				try {
-					const agentState = await readAgentState(currentBranch, rootDir);
+					const agentState = await readAgentState(currentBranch, agentStateRootDir);
 					if (agentState?.task) {
 						// Use task as merge message: "Merge branch 'xyz': task description"
 						mergeMessage = `Merge branch '${currentBranch}': ${agentState.task}`;
@@ -732,9 +744,9 @@ export const finishCommand: CommandDefinition & {
 
 				// Update agent state to merged (if exists)
 				try {
-					const agentState = await readAgentState(currentBranch, rootDir);
+					const agentState = await readAgentState(currentBranch, agentStateRootDir);
 					if (agentState) {
-						await updateAgentStatus(currentBranch, "merged", rootDir);
+						await updateAgentStatus(currentBranch, "merged", agentStateRootDir);
 					}
 				} catch {
 					// Ignore errors - agent state may not exist for non-autonomous worktrees
@@ -749,9 +761,9 @@ export const finishCommand: CommandDefinition & {
 				) {
 					// Update agent state to conflict (if exists)
 					try {
-						const agentState = await readAgentState(currentBranch, rootDir);
+						const agentState = await readAgentState(currentBranch, agentStateRootDir);
 						if (agentState) {
-							await updateAgentStatus(currentBranch, "conflict", rootDir, {
+							await updateAgentStatus(currentBranch, "conflict", agentStateRootDir, {
 								error:
 									"Merge conflict detected. Resolve conflicts and run gf finish again.",
 							});
@@ -865,7 +877,7 @@ export const finishCommand: CommandDefinition & {
 
 			// Send completion notification
 			try {
-				const agentState = await readAgentState(currentBranch, rootDir);
+				const agentState = await readAgentState(currentBranch, agentStateRootDir);
 				await notify({
 					type: "completed",
 					branch: currentBranch,
@@ -885,9 +897,9 @@ export const finishCommand: CommandDefinition & {
 			// Update agent state to failed (if exists and branch is known)
 			if (currentBranch) {
 				try {
-					const agentState = await readAgentState(currentBranch, rootDir);
+					const agentState = await readAgentState(currentBranch, agentStateRootDir);
 					if (agentState) {
-						await updateAgentStatus(currentBranch, "failed", rootDir, {
+						await updateAgentStatus(currentBranch, "failed", agentStateRootDir, {
 							error: errorMessage,
 						});
 					}

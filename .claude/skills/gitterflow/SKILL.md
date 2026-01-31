@@ -291,6 +291,68 @@ Use this to:
 
 The `agentCommand` field shows the exact command that would be run, so you can execute it programmatically.
 
+## Claude Code CLI Integration
+
+For programmatic execution without terminals, use Claude Code's `-p` (print/SDK) mode:
+
+```bash
+# Run Claude Code headlessly in a worktree
+cd /path/to/worktree && claude -p "Your task description" \
+  --allowedTools "Read,Edit,Bash,Grep,Glob" \
+  --append-system-prompt "When done, run: gf finish"
+```
+
+**Key flags:**
+- `-p "prompt"` - Non-interactive/headless mode
+- `--allowedTools` - Auto-approve specific tools (no prompts)
+- `--append-system-prompt` - Add instructions to system prompt
+- `--output-format json` - Get structured output with session ID
+- `--continue` - Continue most recent conversation
+- `--resume <id>` - Resume specific session
+
+**Example: Full headless workflow:**
+```bash
+# 1. Create worktree
+result=$(gf new --task "Add retry logic" --autonomous --headless)
+worktree=$(echo $result | jq -r '.worktree')
+
+# 2. Run Claude Code headlessly
+cd $worktree && claude -p "Implement retry logic with exponential backoff" \
+  --allowedTools "Read,Edit,Write,Bash,Grep,Glob" \
+  --output-format json
+
+# 3. Finish and merge
+gf finish
+```
+
+## Subagent Patterns from Claude Code Docs
+
+Claude Code supports native subagents that can be used alongside GitterFlow:
+
+```bash
+# Define subagents dynamically via CLI
+claude --agents '{
+  "implementer": {
+    "description": "Implements features based on specs",
+    "prompt": "You implement features. Focus on clean code and tests.",
+    "tools": ["Read", "Edit", "Bash"],
+    "model": "sonnet"
+  }
+}'
+```
+
+**When to use GitterFlow vs Claude Code subagents:**
+
+| Use Case | GitterFlow | Claude Code Subagents |
+|----------|------------|----------------------|
+| Isolated git branches | ✅ | ❌ |
+| Parallel merges | ✅ | ❌ |
+| Same-context subtasks | ❌ | ✅ |
+| Read-only exploration | ❌ | ✅ (Explore agent) |
+| Multi-model delegation | ❌ | ✅ (Haiku for fast tasks) |
+
+Combine them: Use GitterFlow for branch isolation, Claude Code subagents for in-worktree task delegation.
+
 ## Important Notes
 
 - Sub-agents merge to **your current branch** (the branch you were on when spawning)
