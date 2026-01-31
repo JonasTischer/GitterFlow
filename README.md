@@ -220,6 +220,12 @@ Creates a new git worktree with an optional branch name. If no branch name is pr
   gf new feature-auth --task "Add OAuth2 authentication"
   ```
 - `--autonomous` or `-a` - Run agent autonomously, auto-merge when done
+- `--headless` or `-H` - Skip terminal/IDE spawning, output JSON (for CI/pipelines/orchestrators)
+  ```bash
+  # Returns JSON with worktree info - perfect for automation
+  gf new --task "Add feature" --autonomous --headless
+  # Output: {"success":true,"branch":"worktree-calm-fox-123","worktree":"/path/to/worktree",...}
+  ```
 
 ### `gitterflow list`
 

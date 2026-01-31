@@ -140,10 +140,11 @@ async function promptUncommittedChanges(
 
 /**
  * Parse command line arguments
- * Returns { branch, task, force, autonomous, planFirst }
+ * Returns { branch, task, force, autonomous, planFirst, headless }
  * --force or -f: auto-create WIP commit if uncommitted changes exist
  * --autonomous or -a: track agent state and instruct to run gf finish
  * --plan-first or -p: start in plan mode, require brain approval before execution
+ * --headless or -H: skip terminal/IDE spawning, output JSON (for CI/server/orchestrators)
  */
 function parseArgs(args: string[]): {
 	branch?: string;
@@ -151,12 +152,14 @@ function parseArgs(args: string[]): {
 	force?: boolean;
 	autonomous?: boolean;
 	planFirst?: boolean;
+	headless?: boolean;
 } {
 	let branch: string | undefined;
 	let task: string | undefined;
 	let force = false;
 	let autonomous = false;
 	let planFirst = false;
+	let headless = false;
 
 	for (let i = 0; i < args.length; i++) {
 		const arg = args[i] ?? "";
@@ -170,6 +173,8 @@ function parseArgs(args: string[]): {
 			autonomous = true;
 		} else if (arg === "--plan-first" || arg === "-p") {
 			planFirst = true;
+		} else if (arg === "--headless" || arg === "-H") {
+			headless = true;
 		} else if (!arg.startsWith("-")) {
 			// Non-flag argument is the branch name
 			if (!branch) {
@@ -178,7 +183,7 @@ function parseArgs(args: string[]): {
 		}
 	}
 
-	return { branch, task, force, autonomous, planFirst };
+	return { branch, task, force, autonomous, planFirst, headless };
 }
 
 /**
@@ -306,10 +311,11 @@ export const newCommand: CommandDefinition & {
 	description:
 		"Create a git worktree (optionally specify branch name and task)",
 	usage:
-		"gitterflow new [branch] [--task <prompt>] [--force] [--autonomous] [--plan-first]",
+		"gitterflow new [branch] [--task <prompt>] [--force] [--autonomous] [--plan-first] [--headless]",
 	run: async ({ args, stderr, stdout, exec, rootDir }: NewCommandContext) => {
-		// Parse arguments for branch name, task, force, autonomous, and planFirst flags
-		const { branch, task, force, autonomous, planFirst } = parseArgs(args);
+		// Parse arguments for branch name, task, force, autonomous, planFirst, and headless flags
+		const { branch, task, force, autonomous, planFirst, headless } =
+			parseArgs(args);
 
 		// --plan-first mode: agent analyzes and writes plan, then waits for approval
 		// Brain reviews plan, uses "gf approve" or "gf reject" to control execution
@@ -430,6 +436,31 @@ export const newCommand: CommandDefinition & {
 				);
 			}
 
+			// Build the agent command for reference
+			const baseAgentCommand = getSetting("coding_agent");
+			const agentCommand = buildAgentCommand(baseAgentCommand, task, {
+				autonomous,
+				planFirst,
+				branch: trimmedBranch,
+			});
+
+			// Headless mode: output JSON and exit (no terminal/IDE spawning)
+			// Useful for CI/CD pipelines, server-side orchestrators, and Clawdbot integration
+			if (headless) {
+				const result = {
+					success: true,
+					branch: trimmedBranch,
+					worktree: absoluteWorktreePath,
+					baseBranch: currentBranch,
+					task: task ?? null,
+					autonomous,
+					planFirst,
+					agentCommand,
+				};
+				stdout(JSON.stringify(result));
+				return 0;
+			}
+
 			// Output informative messages
 			stdout(`✅ Created worktree for branch ${trimmedBranch}`);
 			stdout(`📁 Switched to: ${absoluteWorktreePath}`);
@@ -441,12 +472,6 @@ export const newCommand: CommandDefinition & {
 
 			if (!skipTerminalSpawn) {
 				try {
-					const baseAgentCommand = getSetting("coding_agent");
-					const agentCommand = buildAgentCommand(baseAgentCommand, task, {
-						autonomous,
-						planFirst,
-						branch: trimmedBranch,
-					});
 					const ide = getSetting("ide");
 					const openTerminal = getSetting("open_terminal");
 
@@ -468,12 +493,6 @@ export const newCommand: CommandDefinition & {
 					}
 				} catch {
 					// If spawning fails, fall back to outputting commands
-					const baseAgentCommand = getSetting("coding_agent");
-					const agentCommand = buildAgentCommand(baseAgentCommand, task, {
-						autonomous,
-						planFirst,
-						branch: trimmedBranch,
-					});
 					stdout(`cd ${absoluteWorktreePath}`);
 					stdout(`${agentCommand}`);
 					stderr(
@@ -482,12 +501,6 @@ export const newCommand: CommandDefinition & {
 				}
 			} else {
 				// In test/CI environment, just output the commands
-				const baseAgentCommand = getSetting("coding_agent");
-				const agentCommand = buildAgentCommand(baseAgentCommand, task, {
-					autonomous,
-					planFirst,
-					branch: trimmedBranch,
-				});
 				stdout(`cd ${absoluteWorktreePath}`);
 				stdout(`${agentCommand}`);
 			}

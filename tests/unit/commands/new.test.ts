@@ -550,4 +550,151 @@ describe("new command", () => {
 			expect(taskOutput).not.toContain("gitterflow skill");
 		});
 	});
+
+	describe("headless mode (--headless flag)", () => {
+		const testDir = join(import.meta.dir, ".test-new-headless-tmp");
+
+		beforeEach(async () => {
+			await mkdir(testDir, { recursive: true });
+		});
+
+		afterEach(async () => {
+			await rm(testDir, { recursive: true, force: true });
+		});
+
+		test("should output JSON when --headless flag is provided", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			const exitCode = await newCommand.run({
+				args: ["feature-headless", "--headless"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+			// Should output exactly one line of JSON
+			expect(stdoutMessages).toHaveLength(1);
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.success).toBe(true);
+			expect(output.branch).toBe("feature-headless");
+			expect(output.worktree).toContain("feature-headless");
+			expect(output.baseBranch).toBe("main");
+		});
+
+		test("should support -H shorthand for --headless", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			const exitCode = await newCommand.run({
+				args: ["feature-headless-short", "-H"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			expect(exitCode).toBe(0);
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.success).toBe(true);
+			expect(output.branch).toBe("feature-headless-short");
+		});
+
+		test("should include task in headless JSON output", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-with-task", "--headless", "--task", "Implement feature X"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.task).toBe("Implement feature X");
+			expect(output.agentCommand).toContain("Implement feature X");
+		});
+
+		test("should include autonomous flag in headless JSON output", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-auto-headless", "--headless", "--autonomous"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.autonomous).toBe(true);
+		});
+
+		test("should include planFirst flag in headless JSON output", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-plan-headless", "--headless", "--plan-first"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.planFirst).toBe(true);
+		});
+
+		test("should still write agent state with --headless --autonomous", async () => {
+			const { exec } = captureExec();
+			const { io } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-headless-state", "--headless", "--autonomous", "--task", "Test task"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const state = await readAgentState("feature-headless-state", testDir);
+			expect(state).not.toBeNull();
+			expect(state?.branch).toBe("feature-headless-state");
+			expect(state?.task).toBe("Test task");
+			expect(state?.status).toBe("pending");
+		});
+
+		test("should include agentCommand in headless JSON output", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["feature-cmd", "--headless", "--task", "Do something"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.agentCommand).toBeDefined();
+			expect(output.agentCommand).toContain("claude");
+		});
+
+		test("should generate random branch name with --headless when no branch provided", async () => {
+			const { exec } = captureExec();
+			const { io, stdoutMessages } = commandIO();
+
+			await newCommand.run({
+				args: ["--headless"],
+				exec,
+				...io,
+				rootDir: testDir,
+			});
+
+			const output = JSON.parse(stdoutMessages[0] ?? "{}");
+			expect(output.success).toBe(true);
+			expect(output.branch).toMatch(/^worktree-\w+-\w+-\d+$/);
+		});
+	});
 });
