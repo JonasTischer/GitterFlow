@@ -10,8 +10,9 @@
 - [13:10] Pushed branch clawd/improvements
 
 ### Next Up
-- Add tests for --plan-first workflow
-- Implement gf spawn for batch agent creation
+- Add tests for new commands
+- Implement gf watch for live monitoring
+- Enhanced status display with commit history
 
 ---
 

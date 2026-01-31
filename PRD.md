@@ -12,13 +12,13 @@ GitterFlow is a CLI tool for managing git workflows with AI coding agents. It ha
 - [x] Webhook notifications on completion
 
 ## In Progress 🔄
-- [ ] Add `--plan-first` flag to `gf new` (creates plan before coding)
 - [ ] Enhanced status display with commit history
 
 ## Backlog 📋
 
 ### Priority 1: Core Improvements
-- [ ] Add `gf spawn` command for batch spawning multiple agents
+- [x] Add `--plan-first` flag to `gf new` (creates plan before coding) ✅
+- [x] Add `gf spawn` command for batch spawning multiple agents ✅
 - [ ] Add `gf watch` command for live monitoring agent progress
 - [ ] Improve error handling with actionable messages
 - [ ] Add `--dry-run` flag to preview operations
