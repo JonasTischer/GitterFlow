@@ -48,13 +48,16 @@ export const rejectCommand: CommandDefinition = {
 			return 1;
 		}
 
-		if (state.status !== "awaiting_approval") {
+		// Allow rejection from either 'awaiting_approval' (plan mode) or 'ready' (review mode)
+		if (state.status !== "awaiting_approval" && state.status !== "ready") {
 			stderr(
-				`❌ Agent is not awaiting approval (current status: ${state.status})`,
+				`❌ Agent is not awaiting approval or ready for review (current status: ${state.status})`,
 			);
-			stderr("   Only agents in 'awaiting_approval' status can be rejected.");
+			stderr("   Only agents in 'awaiting_approval' or 'ready' status can be rejected.");
 			return 1;
 		}
+		
+		const isReviewMode = state.status === "ready";
 
 		// Ensure the agent workspace directory exists
 		const agentDir = join(".gitterflow", "agents", branch);
@@ -92,22 +95,39 @@ The agent can:
 			await Bun.write(feedbackPath, feedbackContent);
 		}
 
-		// Update status to failed with rejection reason
-		await updateAgentStatus(branch, "failed", {
-			error: message ? `Plan rejected: ${message}` : "Plan rejected by brain",
-		});
+		if (isReviewMode) {
+			// REVIEW MODE: Put agent back to running so they can address feedback
+			await updateAgentStatus(branch, "running");
 
-		stdout(`❌ Rejected plan for ${branch}`);
-		if (message) {
-			stdout(`📝 Feedback: ${message}`);
+			stdout(`🔄 Requested changes for ${branch}`);
+			if (message) {
+				stdout(`📝 Feedback: ${message}`);
+			}
+			stdout("");
+			stdout("💡 The agent should:");
+			stdout(`   1. Read feedback in: .gitterflow/agents/${branch}/brain-feedback.md`);
+			stdout(`   2. Address the requested changes`);
+			stdout(`   3. Run 'gf ready' when done`);
+			stdout("");
+			stdout(`📁 Worktree: ${state.worktree_path}`);
+		} else {
+			// PLAN MODE: Update status to failed with rejection reason
+			await updateAgentStatus(branch, "failed", undefined, {
+				error: message ? `Plan rejected: ${message}` : "Plan rejected by brain",
+			});
+
+			stdout(`❌ Rejected plan for ${branch}`);
+			if (message) {
+				stdout(`📝 Feedback: ${message}`);
+			}
+			stdout("");
+			stdout("💡 Options:");
+			stdout(`   - Re-plan: Navigate to worktree and run 'gf new --plan-first'`);
+			stdout(
+				`   - Manual: Work directly in the worktree at ${state.worktree_path}`,
+			);
+			stdout(`   - Cleanup: Run 'git worktree remove ${state.worktree_path}'`);
 		}
-		stdout("");
-		stdout("💡 Options:");
-		stdout(`   - Re-plan: Navigate to worktree and run 'gf new --plan-first'`);
-		stdout(
-			`   - Manual: Work directly in the worktree at ${state.worktree_path}`,
-		);
-		stdout(`   - Cleanup: Run 'git worktree remove ${state.worktree_path}'`);
 
 		return 0;
 	},

@@ -8,6 +8,7 @@ import { markFailedCommand } from "./mark-failed";
 import { newCommand } from "./new";
 import { readyCommand } from "./ready";
 import { rejectCommand } from "./reject";
+import { reviewCommand } from "./review";
 import { snapCommand } from "./snap";
 import { spawnCommand } from "./spawn";
 import { startedCommand } from "./started";
@@ -28,6 +29,7 @@ export const commandMap: Record<string, CommandDefinition> = {
 	started: startedCommand,
 	status: statusCommand,
 	"mark-failed": markFailedCommand,
+	review: reviewCommand,
 	approve: approveCommand,
 	reject: rejectCommand,
 	watch: watchCommand,
@@ -47,6 +49,7 @@ export const orderedCommands: CommandDefinition[] = [
 	listCommand,
 	statusCommand,
 	watchCommand,
+	reviewCommand,
 	approveCommand,
 	rejectCommand,
 	deleteCommand,

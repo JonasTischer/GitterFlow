@@ -141,13 +141,14 @@ async function promptUncommittedChanges(
 
 /**
  * Parse command line arguments
- * Returns { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, parent }
+ * Returns { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, minimal, parent }
  * --force or -f: auto-create WIP commit if uncommitted changes exist
  * --autonomous or -a: track agent state and instruct to run gf finish
  * --plan-first or -p: start in plan mode, require brain approval before execution
  * --headless or -H: skip terminal/IDE spawning, output JSON (for CI/server/orchestrators)
  * --spawn or -s: actually spawn claude -p in background (implies --headless --autonomous)
  * --allowed-tools: comma-separated list of tools to pre-approve (default: Read,Edit,Write,Bash,Grep,Glob)
+ * --minimal or -m: Pi-style minimal agent with only 4 tools (Read,Write,Edit,Bash)
  * --parent: parent branch name (for recursive sub-agent tracking)
  */
 function parseArgs(args: string[]): {
@@ -159,6 +160,7 @@ function parseArgs(args: string[]): {
 	headless?: boolean;
 	spawn?: boolean;
 	allowedTools?: string;
+	minimal?: boolean;
 	parent?: string;
 } {
 	let branch: string | undefined;
@@ -169,6 +171,7 @@ function parseArgs(args: string[]): {
 	let headless = false;
 	let spawn = false;
 	let allowedTools: string | undefined;
+	let minimal = false;
 	let parent: string | undefined;
 
 	for (let i = 0; i < args.length; i++) {
@@ -191,6 +194,8 @@ function parseArgs(args: string[]): {
 		} else if (arg === "--allowed-tools") {
 			allowedTools = args[i + 1];
 			i++;
+		} else if (arg === "--minimal" || arg === "-m") {
+			minimal = true;
 		} else if (arg === "--parent") {
 			parent = args[i + 1];
 			i++;
@@ -201,7 +206,7 @@ function parseArgs(args: string[]): {
 		}
 	}
 
-	return { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, parent };
+	return { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, minimal, parent };
 }
 
 /**
@@ -209,6 +214,12 @@ function parseArgs(args: string[]): {
  * These cover most common development tasks
  */
 const DEFAULT_ALLOWED_TOOLS = "Read,Edit,Write,Bash,Grep,Glob,WebSearch,WebFetch";
+
+/**
+ * Pi-style minimal tools: only 4 core tools
+ * Agent can self-extend by writing scripts and running them via Bash
+ */
+const MINIMAL_TOOLS = "Read,Edit,Write,Bash";
 
 /**
  * Build the agent command with optional task
@@ -219,6 +230,7 @@ const DEFAULT_ALLOWED_TOOLS = "Read,Edit,Write,Bash,Grep,Glob,WebSearch,WebFetch
  *   --append-system-prompt with finish instruction (when autonomous)
  *   --allowedTools for headless execution (when spawn mode)
  *   -p for print/headless mode (when spawn mode)
+ *   --minimal for Pi-style 4-tool agents
  */
 function buildAgentCommand(
 	baseCommand: string,
@@ -229,6 +241,7 @@ function buildAgentCommand(
 		branch?: string;
 		spawn?: boolean;
 		allowedTools?: string;
+		minimal?: boolean;
 	},
 ): string {
 	// For claude, add permission mode flag
@@ -293,7 +306,10 @@ Anything needing clarification`;
 	// For spawn mode, add -p flag and allowedTools
 	if (options?.spawn) {
 		flags.unshift("-p"); // Add print/headless mode flag at the start
-		const tools = options.allowedTools || DEFAULT_ALLOWED_TOOLS;
+		// Use minimal tools if --minimal flag is set, otherwise use provided or default
+		const tools = options.minimal 
+			? MINIMAL_TOOLS 
+			: (options.allowedTools || DEFAULT_ALLOWED_TOOLS);
 		flags.push(`--allowedTools "${tools}"`);
 	}
 
@@ -350,10 +366,10 @@ export const newCommand: CommandDefinition & {
 	description:
 		"Create a git worktree (optionally specify branch name and task)",
 	usage:
-		"gitterflow new [branch] [--task <prompt>] [--force] [--autonomous] [--plan-first] [--headless] [--spawn] [--parent <branch>] [--allowed-tools <tools>]",
+		"gitterflow new [branch] [--task <prompt>] [--force] [--autonomous] [--plan-first] [--headless] [--spawn] [--minimal] [--parent <branch>] [--allowed-tools <tools>]",
 	run: async ({ args, stderr, stdout, exec, rootDir }: NewCommandContext) => {
-		// Parse arguments for branch name, task, force, autonomous, planFirst, headless, spawn, etc.
-		const { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, parent } =
+		// Parse arguments for branch name, task, force, autonomous, planFirst, headless, spawn, minimal, etc.
+		const { branch, task, force, autonomous, planFirst, headless, spawn, allowedTools, minimal, parent } =
 			parseArgs(args);
 
 		// --plan-first mode: agent analyzes and writes plan, then waits for approval
@@ -498,6 +514,7 @@ export const newCommand: CommandDefinition & {
 				branch: trimmedBranch,
 				spawn,
 				allowedTools,
+				minimal,
 			});
 
 			// Spawn mode: actually run claude -p in background
@@ -544,6 +561,7 @@ export const newCommand: CommandDefinition & {
 					task: task ?? null,
 					autonomous,
 					planFirst,
+					minimal,
 					spawn: true,
 					pid: pid ?? null,
 					agentCommand,
@@ -564,6 +582,7 @@ export const newCommand: CommandDefinition & {
 					task: task ?? null,
 					autonomous,
 					planFirst,
+					minimal,
 					agentCommand,
 					parent: parent ?? null,
 				};
